@@ -20,9 +20,9 @@ export function Header({ activeHref = '/' }: Props) {
     <header className="flex items-center h-[52px] px-5 bg-[#002c6c] flex-shrink-0 z-50 gap-6">
       {/* Logo + 시스템명 */}
       <div className="flex items-center gap-3 flex-shrink-0">
-        <img src="/logo.svg" alt="Hyundai" height={22} style={{ display: 'block' }} />
+        <img src="/logo.svg" alt="Hyundai" height={20} style={{ display: 'block' }} />
         <span className="w-px h-4 bg-white/30" />
-        <span className="text-[13px] font-medium text-white/90 whitespace-nowrap">
+        <span className="text-[14px] font-medium text-white/90 whitespace-nowrap">
           통합안전관제시스템
         </span>
       </div>
@@ -111,7 +111,7 @@ export function Header({ activeHref = '/' }: Props) {
           <div className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
             KS
           </div>
-          <span className="text-[13px] text-white font-medium">김실비</span>
+          <span className="text-[13px] text-white font-medium">김설비</span>
           <svg
             className="w-3 h-3 text-white/50"
             fill="none"

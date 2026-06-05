@@ -8,31 +8,46 @@ interface SelectFieldProps {
 }
 
 function SelectField({ label, options, value, onChange }: SelectFieldProps) {
+  const [focused, setFocused] = useState(false)
+  const floated = focused || Boolean(value)
+
   return (
-    <div className="flex flex-col gap-0.5 mb-3 last:mb-0">
-      <span className="text-[11px] text-slate-400">{label}</span>
-      <div className="relative">
-        <select
-          className="w-full h-9 pl-3 pr-8 border border-slate-200 rounded-md bg-white text-[13px] text-slate-800 appearance-none cursor-pointer focus:outline-none focus:border-blue-400"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-        <svg
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
-          fill="none"
-          viewBox="0 0 12 12"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
+    <div className="relative mb-3 last:mb-0">
+      <select
+        className="w-full h-[36px] px-2 py-1 border border-slate-200 rounded-lg bg-white text-[13px] text-slate-800 appearance-none cursor-pointer focus:outline-none focus:border-blue-400 transition-colors"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      >
+        <option value="" disabled hidden />
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+
+      <span
+        className={[
+          'absolute left-3 text-slate-400 pointer-events-none bg-white transition-all duration-150',
+          floated
+            ? '-top-[4px] px-1 text-[11px] leading-none'
+            : 'top-1/2 -translate-y-1/2 text-[13px]',
+        ].join(' ')}
+      >
+        {label}
+      </span>
+
+      <svg
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
+        fill="none"
+        viewBox="0 0 12 12"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </div>
   )
 }
@@ -57,15 +72,15 @@ function PanelIcon() {
 const INITIAL_FAVORITES = ['울산5공장', '아산공장', '광주공장']
 
 export function Sidebar() {
-  const [corporation, setCorporation] = useState('HYUNDAI')
-  const [plant, setPlant] = useState('울산공장')
-  const [factory, setFactory] = useState('5공장')
-  const [line, setLine] = useState('도장공정')
-  const [equipment, setEquipment] = useState('A라인')
-  const [measurePoint, setMeasurePoint] = useState('A라인')
-  const [area, setArea] = useState('환경')
-  const [facility, setFacility] = useState('대기')
-  const [sensor, setSensor] = useState('대기질')
+  const [corporation, setCorporation] = useState('')
+  const [plant, setPlant] = useState('')
+  const [factory, setFactory] = useState('')
+  const [line, setLine] = useState('')
+  const [equipment, setEquipment] = useState('')
+  const [measurePoint, setMeasurePoint] = useState('')
+  const [area, setArea] = useState('')
+  const [facility, setFacility] = useState('')
+  const [sensor, setSensor] = useState('')
   const [favorites, setFavorites] = useState(INITIAL_FAVORITES)
 
   const removeFavorite = (name: string) => setFavorites((prev) => prev.filter((f) => f !== name))
@@ -75,7 +90,7 @@ export function Sidebar() {
       {/* 법인/사업장/공장 선택 */}
       <section className="px-4 pt-4 pb-5 border-b border-slate-100">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[13px] font-semibold text-slate-700">법인/사업장/공장 선택</h3>
+          <h3 className="text-[12px] font-semibold text-slate-700">법인/사업장/공장 선택</h3>
           <button className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
             <PanelIcon />
           </button>
