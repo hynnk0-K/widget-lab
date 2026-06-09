@@ -26,5 +26,12 @@ export const api = {
     request<T>(path, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body !== undefined ? JSON.stringify(body) : undefined }),
+  // 문자열 body를 그대로 전송 (text/plain) — Spring @RequestBody String 이 raw string 으로 받을 때 사용
+  putString: <T>(path: string, body: string) =>
+    request<T>(path, {
+      method: 'PUT',
+      body,
+      headers: { 'Content-Type': 'text/plain' },
+    }),
   delete: <T = void>(path: string) => request<T>(path, { method: 'DELETE' }),
 }

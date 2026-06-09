@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/shared/lib/api'
+import { useAuthStore } from '@/shared/store/auth'
 import { WidgetGrid } from '@/shared/ui/widgets/WidgetGrid'
 import { AddWidgetModal } from '@/shared/ui/widgets/AddWidgetModal'
 import type { DashboardLayout, Widget } from '@/shared/ui/widgets/types'
 
-interface DashboardResponse {
-  layout: DashboardLayout
+interface UserDashboard {
+  userId: number
+  username: string
+  displayName: string
+  layout: string
+  updatedAt: string
 }
 
 function nextPosition(widgets: Widget[]) {
@@ -14,28 +19,41 @@ function nextPosition(widgets: Widget[]) {
   return { x: 0, y: maxY }
 }
 
+function parseLayout(raw: string): DashboardLayout {
+  try {
+    const first = JSON.parse(raw)
+    // 이중 인코딩 방어: 파싱 결과가 여전히 string이면 한 번 더 파싱
+    return typeof first === 'string' ? JSON.parse(first) : first
+  } catch {
+    return { version: 1, widgets: [] }
+  }
+}
+
 export function HomePage() {
+  const username = useAuthStore((s) => s.user?.username ?? '')
   const [layout, setLayout] = useState<DashboardLayout | null>(null)
-  const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
+  // layout === null 이면 로딩 중 (setLoading 상태 없이 파생)
   useEffect(() => {
+    if (!username) return
     api
-      .get<DashboardResponse>('/dashboard')
-      .then((data) => setLayout(data.layout))
+      .get<UserDashboard>(`/dashboards/${username}`)
+      .then((data) => setLayout(parseLayout(data.layout)))
       .catch(() => setLayout({ version: 1, widgets: [] }))
-      .finally(() => setLoading(false))
-  }, [])
+  }, [username, refreshKey])
 
   async function handleSave() {
     if (!layout) return
     setSaving(true)
     setSaveError('')
     try {
-      await api.put('/dashboard', { layout })
+      // text/plain + raw JSON string → Spring @RequestBody String이 outer quote 없이 받음
+      await api.putString<UserDashboard>(`/dashboards/${username}`, JSON.stringify(layout))
       setEditMode(false)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : '저장 실패')
@@ -47,13 +65,8 @@ export function HomePage() {
   function handleCancelEdit() {
     setEditMode(false)
     setSaveError('')
-    // 저장 전 취소 시 서버에서 다시 불러오기
-    setLoading(true)
-    api
-      .get<DashboardResponse>('/dashboard')
-      .then((data) => setLayout(data.layout))
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    setLayout(null)
+    setRefreshKey((k) => k + 1)
   }
 
   function handleRemove(id: string) {
@@ -62,18 +75,20 @@ export function HomePage() {
     )
   }
 
+  function handleLayoutChange(updatedWidgets: Widget[]) {
+    setLayout((prev) => (prev ? { ...prev, widgets: updatedWidgets } : prev))
+  }
+
   function handleAddWidget(partial: Omit<Widget, 'id'>) {
     const id = `w_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
     const { x, y } = nextPosition(layout?.widgets ?? [])
     const widget: Widget = { ...partial, id, x, y }
-    setLayout((prev) =>
-      prev ? { ...prev, widgets: [...prev.widgets, widget] } : prev,
-    )
+    setLayout((prev) => (prev ? { ...prev, widgets: [...prev.widgets, widget] } : prev))
     setShowModal(false)
     if (!editMode) setEditMode(true)
   }
 
-  if (loading) {
+  if (layout === null) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3">
@@ -93,18 +108,14 @@ export function HomePage() {
             실시간 모니터링
           </h1>
           {layout && (
-            <p className="m-0 text-[12px] text-slate-400 mt-0.5">
-              위젯 {layout.widgets.length}개
-            </p>
+            <p className="m-0 text-[12px] text-slate-400 mt-0.5">위젯 {layout.widgets.length}개</p>
           )}
         </div>
 
         <div className="flex items-center gap-2">
           {editMode ? (
             <>
-              {saveError && (
-                <span className="text-[12px] text-red-500">{saveError}</span>
-              )}
+              {saveError && <span className="text-[12px] text-red-500">{saveError}</span>}
               <button
                 onClick={handleCancelEdit}
                 className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors"
@@ -130,8 +141,18 @@ export function HomePage() {
               onClick={() => setEditMode(true)}
               className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={2}>
-                <path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 16 16"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               위젯 편집
             </button>
@@ -141,10 +162,21 @@ export function HomePage() {
 
       {/* 위젯 그리드 or 빈 상태 */}
       {layout && layout.widgets.length > 0 ? (
-        <WidgetGrid layout={layout} editMode={editMode} onRemove={handleRemove} />
+        <WidgetGrid
+          layout={layout}
+          editMode={editMode}
+          onRemove={handleRemove}
+          onLayoutChange={handleLayoutChange}
+        />
       ) : (
         <div className="flex flex-col items-center justify-center min-h-[320px] bg-white rounded-xl border-2 border-dashed border-slate-200">
-          <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 48 48" stroke="currentColor" strokeWidth={1.5}>
+          <svg
+            className="w-12 h-12 text-slate-300 mb-3"
+            fill="none"
+            viewBox="0 0 48 48"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
             <rect x="4" y="4" width="18" height="18" rx="3" />
             <rect x="26" y="4" width="18" height="18" rx="3" />
             <rect x="4" y="26" width="18" height="18" rx="3" />
@@ -163,7 +195,6 @@ export function HomePage() {
         </div>
       )}
 
-      {/* 위젯 추가 모달 */}
       {showModal && (
         <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />
       )}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { cn } from '@/shared/lib/cn'
 
 interface SelectFieldProps {
   label: string
@@ -52,9 +53,15 @@ function SelectField({ label, options, value, onChange }: SelectFieldProps) {
   )
 }
 
-function PanelIcon() {
+function PanelIcon({ flipped = false }: { flipped?: boolean }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      style={flipped ? { transform: 'scaleX(-1)' } : undefined}
+    >
       <rect
         x="0.75"
         y="0.75"
@@ -72,6 +79,7 @@ function PanelIcon() {
 const INITIAL_FAVORITES = ['울산5공장', '아산공장', '광주공장']
 
 export function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false)
   const [corporation, setCorporation] = useState('')
   const [plant, setPlant] = useState('')
   const [factory, setFactory] = useState('')
@@ -86,104 +94,127 @@ export function Sidebar() {
   const removeFavorite = (name: string) => setFavorites((prev) => prev.filter((f) => f !== name))
 
   return (
-    <aside className="w-[210px] flex-shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-y-auto flex flex-col">
-      {/* 법인/사업장/공장 선택 */}
-      <section className="px-4 pt-4 pb-5 border-b border-slate-100">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[12px] font-semibold text-slate-700">법인/사업장/공장 선택</h3>
-          <button className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors">
-            <PanelIcon />
-          </button>
-        </div>
-
-        <SelectField
-          label="법인"
-          options={['HYUNDAI', 'KIA']}
-          value={corporation}
-          onChange={setCorporation}
-        />
-        <SelectField
-          label="사업장"
-          options={['울산공장', '아산공장', '전주공장']}
-          value={plant}
-          onChange={setPlant}
-        />
-        <SelectField
-          label="공장"
-          options={['5공장', '1공장', '2공장']}
-          value={factory}
-          onChange={setFactory}
-        />
-        <SelectField
-          label="라인"
-          options={['도장공정', 'A라인', 'B라인']}
-          value={line}
-          onChange={setLine}
-        />
-        <SelectField
-          label="장비"
-          options={['A라인', 'B라인', 'C라인']}
-          value={equipment}
-          onChange={setEquipment}
-        />
-        <SelectField
-          label="측정포인트"
-          options={['A라인', 'B라인', 'C라인']}
-          value={measurePoint}
-          onChange={setMeasurePoint}
-        />
-      </section>
-      
-      {/* 카테고리 선택 */}
-      <section className="px-4 pt-4 pb-5 border-b border-slate-100">
-        <h3 className="text-[13px] font-semibold text-slate-700 mb-4">카테고리 선택</h3>
-
-        <SelectField
-          label="영역"
-          options={['환경', '안전', '보건']}
-          value={area}
-          onChange={setArea}
-        />
-        <SelectField
-          label="설비"
-          options={['대기', '수질', '토양']}
-          value={facility}
-          onChange={setFacility}
-        />
-        <SelectField
-          label="센서"
-          options={['대기질', '대기월', '수질일']}
-          value={sensor}
-          onChange={setSensor}
-        />
-      </section>
-
-      {/* 즐겨찾는 공장 */}
-      <section className="px-4 pt-4 pb-5">
-        <h3 className="text-[13px] font-semibold text-slate-700 mb-3">즐겨찾는 공장</h3>
-
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {favorites.map((name) => (
-            <span
-              key={name}
-              className="inline-flex items-center gap-1 pl-2 pr-1 py-1 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700"
-            >
-              <span className="text-yellow-400 leading-none">★</span>
-              <span>{name}</span>
-              <button
-                onClick={() => removeFavorite(name)}
-                className="w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-600 leading-none text-[14px] ml-0.5"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-
-        <button className="w-full h-8 border border-slate-200 rounded-full text-[13px] text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors">
-          + 추가
+    <aside
+      className={cn(
+        'flex-shrink-0 bg-white rounded-xl border border-slate-200/80 shadow-sm flex flex-col transition-[width] duration-200 overflow-hidden',
+        collapsed ? 'w-[44px]' : 'w-[210px]',
+      )}
+    >
+      {collapsed ? (
+        /* ── 접힌 상태: 열기 버튼만 ── */
+        <button
+          onClick={() => setCollapsed(false)}
+          title="사이드바 열기"
+          className="w-full flex items-center justify-center py-3.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+        >
+          <PanelIcon flipped />
         </button>
-      </section>
+      ) : (
+        /* ── 펼친 상태: 전체 내용 ── */
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          {/* 법인/사업장/공장 선택 */}
+          <section className="px-4 pt-4 pb-5 border-b border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[12px] font-semibold text-slate-700">법인/사업장/공장 선택</h3>
+              <button
+                onClick={() => setCollapsed(true)}
+                title="사이드바 닫기"
+                className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors"
+              >
+                <PanelIcon />
+              </button>
+            </div>
+
+            <SelectField
+              label="법인"
+              options={['HYUNDAI', 'KIA']}
+              value={corporation}
+              onChange={setCorporation}
+            />
+            <SelectField
+              label="사업장"
+              options={['울산공장', '아산공장', '전주공장']}
+              value={plant}
+              onChange={setPlant}
+            />
+            <SelectField
+              label="공장"
+              options={['5공장', '1공장', '2공장']}
+              value={factory}
+              onChange={setFactory}
+            />
+            <SelectField
+              label="라인"
+              options={['도장공정', 'A라인', 'B라인']}
+              value={line}
+              onChange={setLine}
+            />
+            <SelectField
+              label="장비"
+              options={['A라인', 'B라인', 'C라인']}
+              value={equipment}
+              onChange={setEquipment}
+            />
+            <SelectField
+              label="측정포인트"
+              options={['A라인', 'B라인', 'C라인']}
+              value={measurePoint}
+              onChange={setMeasurePoint}
+            />
+          </section>
+
+          {/* 카테고리 선택 */}
+          <section className="px-4 pt-4 pb-5 border-b border-slate-100">
+            <h3 className="text-[13px] font-semibold text-slate-700 mb-4">카테고리 선택</h3>
+
+            <SelectField
+              label="영역"
+              options={['환경', '안전', '보건']}
+              value={area}
+              onChange={setArea}
+            />
+            <SelectField
+              label="설비"
+              options={['대기', '수질', '토양']}
+              value={facility}
+              onChange={setFacility}
+            />
+            <SelectField
+              label="센서"
+              options={['대기질', '대기월', '수질일']}
+              value={sensor}
+              onChange={setSensor}
+            />
+          </section>
+
+          {/* 즐겨찾는 공장 */}
+          <section className="px-4 pt-4 pb-5">
+            <h3 className="text-[13px] font-semibold text-slate-700 mb-3">즐겨찾는 공장</h3>
+
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {favorites.map((name) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 pl-2 pr-1 py-1 bg-white border border-slate-200 rounded-full text-[12px] text-slate-700"
+                >
+                  <span className="text-yellow-400 leading-none">★</span>
+                  <span>{name}</span>
+                  <button
+                    onClick={() => removeFavorite(name)}
+                    className="w-4 h-4 flex items-center justify-center text-slate-400 hover:text-slate-600 leading-none text-[14px] ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <button className="w-full h-8 border border-slate-200 rounded-full text-[13px] text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-colors">
+              + 추가
+            </button>
+          </section>
+        </div>
+      )}
     </aside>
   )
 }

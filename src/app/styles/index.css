@@ -61,3 +61,45 @@
     font-family: var(--font-sans);
   }
 }
+
+/* ── react-grid-layout 커스텀 스타일 ── */
+
+/* 드래그 중 플레이스홀더 */
+.react-grid-item.react-grid-placeholder {
+  background: #003087;
+  opacity: 0.12;
+  border-radius: 12px;
+  border: 2px dashed #003087;
+}
+
+/* 리사이즈 핸들: 오른쪽 하단 L자 */
+.react-resizable-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  bottom: 5px;
+  right: 5px;
+  background-image: none;
+  border-bottom: 2.5px solid #94a3b8;
+  border-right: 2.5px solid #94a3b8;
+  border-radius: 0 0 8px 0;
+  opacity: 0;
+  transition: opacity 0.15s, border-color 0.15s;
+  cursor: se-resize;
+  z-index: 10;
+}
+
+.react-grid-item:hover .react-resizable-handle {
+  opacity: 1;
+}
+
+.react-resizable-handle:hover {
+  border-color: #003087;
+}
+
+/* 드래그 중 커서 */
+.react-grid-item.react-draggable-dragging {
+  box-shadow: 0 12px 32px rgba(0, 48, 135, 0.18);
+  opacity: 0.92;
+  z-index: 100;
+}
