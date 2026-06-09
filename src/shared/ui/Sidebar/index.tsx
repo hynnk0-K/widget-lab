@@ -133,7 +133,7 @@ export function Sidebar() {
           onChange={setMeasurePoint}
         />
       </section>
-
+      
       {/* 카테고리 선택 */}
       <section className="px-4 pt-4 pb-5 border-b border-slate-100">
         <h3 className="text-[13px] font-semibold text-slate-700 mb-4">카테고리 선택</h3>

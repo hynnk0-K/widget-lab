@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { cn } from '@/shared/lib/cn'
+import { api } from '@/shared/lib/api'
+import { useAuthStore } from '@/shared/store/auth'
 
 const NAV_ITEMS = [
   { label: '실시간 모니터링', href: '/' },
@@ -13,8 +16,30 @@ interface Props {
   activeHref?: string
 }
 
+function initials(name: string) {
+  if (!name) return '?'
+  const trimmed = name.trim()
+  if (trimmed.length <= 2) return trimmed
+  // 한글 이름: 성 + 이름 첫 글자
+  return trimmed[0] + trimmed[trimmed.length - 1]
+}
+
 export function Header({ activeHref = '/' }: Props) {
   const [search, setSearch] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const user = useAuthStore((s) => s.user)
+  const logout = useAuthStore((s) => s.logout)
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // 토큰이 만료됐어도 로컬 정리 후 이동
+    }
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <header className="flex items-center h-[52px] px-5 bg-[#002c6c] flex-shrink-0 z-50 gap-6">
@@ -107,20 +132,60 @@ export function Header({ activeHref = '/' }: Props) {
         </button>
 
         {/* Profile */}
-        <div className="flex items-center gap-1.5 pl-1 cursor-pointer hover:bg-white/10 rounded px-2 py-1 transition-colors">
-          <div className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
-            KS
-          </div>
-          <span className="text-[13px] text-white font-medium">김설비</span>
-          <svg
-            className="w-3 h-3 text-white/50"
-            fill="none"
-            viewBox="0 0 12 12"
-            stroke="currentColor"
-            strokeWidth={2}
+        <div className="relative">
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="flex items-center gap-1.5 pl-1 hover:bg-white/10 rounded px-2 py-1 transition-colors"
           >
-            <path d="M2 4l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+            <div className="w-7 h-7 bg-[#003087] border border-white/30 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
+              {initials(user?.displayName ?? '')}
+            </div>
+            <span className="text-[13px] text-white font-medium">
+              {user?.displayName ?? ''}
+            </span>
+            <svg
+              className="w-3 h-3 text-white/50"
+              fill="none"
+              viewBox="0 0 12 12"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path d="M2 4l4 4 4-4" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {profileOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 z-50 py-1 overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-100">
+                  <p className="text-[13px] font-semibold text-slate-800 m-0">
+                    {user?.displayName}
+                  </p>
+                  <p className="text-[11px] text-slate-400 m-0">{user?.username}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 16 16"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M10 11l3-3-3-3M13 8H6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  로그아웃
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>
