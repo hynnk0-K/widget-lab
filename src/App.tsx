@@ -6,6 +6,12 @@ import { useAuthStore } from '@/shared/store/auth'
 import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
+import { FactoryPage } from '@/pages/service/factory'
+import { ProcessPage } from '@/pages/service/process'
+import { LinePage } from '@/pages/service/line'
+import { FacilityPage } from '@/pages/service/facility'
+import { CompanyPage } from '@/pages/system/company'
+import { SitePage } from '@/pages/system/site'
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -27,6 +33,12 @@ function App() {
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/service/factory" element={<FactoryPage />} />
+                    <Route path="/service/process" element={<ProcessPage />} />
+                    <Route path="/service/line" element={<LinePage />} />
+                    <Route path="/service/facility" element={<FacilityPage />} />
+                    <Route path="/system/company" element={<CompanyPage />} />
+                    <Route path="/system/site" element={<SitePage />} />
                   </Routes>
                 </Layout>
               </AuthGuard>

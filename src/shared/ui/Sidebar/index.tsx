@@ -1,30 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/shared/lib/cn'
+import { api } from '@/shared/lib/api'
+
+interface MasterTreeNode {
+  type: string
+  id: number
+  code: string
+  name: string
+  children?: MasterTreeNode[]
+}
+
+interface SelectOption {
+  value: string
+  label: string
+}
 
 interface SelectFieldProps {
   label: string
-  options: string[]
+  options: SelectOption[]
   value: string
   onChange: (v: string) => void
+  disabled?: boolean
 }
 
-function SelectField({ label, options, value, onChange }: SelectFieldProps) {
+function SelectField({ label, options, value, onChange, disabled = false }: SelectFieldProps) {
   const [focused, setFocused] = useState(false)
   const floated = focused || Boolean(value)
 
   return (
     <div className="relative mb-3 last:mb-0">
       <select
-        className="w-full h-[36px] px-2 py-1 border border-slate-200 rounded-lg bg-white text-[13px] text-slate-800 appearance-none cursor-pointer focus:outline-none focus:border-blue-400 transition-colors"
+        className={cn(
+          'w-full h-[36px] px-2 py-1 border border-slate-200 rounded-lg bg-white text-[13px] text-slate-800 appearance-none focus:outline-none focus:border-blue-400 transition-colors',
+          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
+        )}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        disabled={disabled || options.length === 0}
       >
         <option value="" disabled hidden />
         {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
           </option>
         ))}
       </select>
@@ -76,20 +95,81 @@ function PanelIcon({ flipped = false }: { flipped?: boolean }) {
   )
 }
 
+function getDescendants(nodes: MasterTreeNode[], targetType: string): MasterTreeNode[] {
+  const result: MasterTreeNode[] = []
+  for (const node of nodes) {
+    if (node.type === targetType) {
+      result.push(node)
+    } else if (node.children?.length) {
+      result.push(...getDescendants(node.children, targetType))
+    }
+  }
+  return result
+}
+
+function toOptions(nodes: MasterTreeNode[]): SelectOption[] {
+  return nodes.map((n) => ({ value: String(n.id), label: n.name }))
+}
+
 const INITIAL_FAVORITES = ['울산5공장', '아산공장', '광주공장']
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
-  const [corporation, setCorporation] = useState('')
-  const [plant, setPlant] = useState('')
-  const [factory, setFactory] = useState('')
-  const [line, setLine] = useState('')
-  const [equipment, setEquipment] = useState('')
-  const [measurePoint, setMeasurePoint] = useState('')
+  const [tree, setTree] = useState<MasterTreeNode[]>([])
+
+  const [companyId, setCompanyId] = useState('')
+  const [siteId, setSiteId] = useState('')
+  const [factoryId, setFactoryId] = useState('')
+  const [lineId, setLineId] = useState('')
+  const [equipmentId, setEquipmentId] = useState('')
+
   const [area, setArea] = useState('')
   const [facility, setFacility] = useState('')
   const [sensor, setSensor] = useState('')
   const [favorites, setFavorites] = useState(INITIAL_FAVORITES)
+
+  useEffect(() => {
+    api
+      .get<MasterTreeNode[]>('/master/tree')
+      .then((data) => setTree(data))
+      .catch(() => setTree([]))
+  }, [])
+
+  const companies = tree.filter((n) => n.type === 'company')
+  const selectedCompany = companies.find((n) => String(n.id) === companyId)
+  const sites = selectedCompany?.children?.filter((n) => n.type === 'site') ?? []
+  const selectedSite = sites.find((n) => String(n.id) === siteId)
+  const factories = selectedSite?.children?.filter((n) => n.type === 'factory') ?? []
+  const selectedFactory = factories.find((n) => String(n.id) === factoryId)
+  const lines = selectedFactory ? getDescendants([selectedFactory], 'line') : []
+  const selectedLine = lines.find((n) => String(n.id) === lineId)
+  const equipment = selectedLine?.children?.filter((n) => n.type === 'equipment') ?? []
+
+  function handleCompanyChange(id: string) {
+    setCompanyId(id)
+    setSiteId('')
+    setFactoryId('')
+    setLineId('')
+    setEquipmentId('')
+  }
+
+  function handleSiteChange(id: string) {
+    setSiteId(id)
+    setFactoryId('')
+    setLineId('')
+    setEquipmentId('')
+  }
+
+  function handleFactoryChange(id: string) {
+    setFactoryId(id)
+    setLineId('')
+    setEquipmentId('')
+  }
+
+  function handleLineChange(id: string) {
+    setLineId(id)
+    setEquipmentId('')
+  }
 
   const removeFavorite = (name: string) => setFavorites((prev) => prev.filter((f) => f !== name))
 
@@ -101,7 +181,6 @@ export function Sidebar() {
       )}
     >
       {collapsed ? (
-        /* ── 접힌 상태: 열기 버튼만 ── */
         <button
           onClick={() => setCollapsed(false)}
           title="사이드바 열기"
@@ -110,7 +189,6 @@ export function Sidebar() {
           <PanelIcon flipped />
         </button>
       ) : (
-        /* ── 펼친 상태: 전체 내용 ── */
         <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
           {/* 법인/사업장/공장 선택 */}
           <section className="px-4 pt-4 pb-5 border-b border-slate-100">
@@ -127,39 +205,37 @@ export function Sidebar() {
 
             <SelectField
               label="법인"
-              options={['HYUNDAI', 'KIA']}
-              value={corporation}
-              onChange={setCorporation}
+              options={toOptions(companies)}
+              value={companyId}
+              onChange={handleCompanyChange}
             />
             <SelectField
               label="사업장"
-              options={['울산공장', '아산공장', '전주공장']}
-              value={plant}
-              onChange={setPlant}
+              options={toOptions(sites)}
+              value={siteId}
+              onChange={handleSiteChange}
+              disabled={!companyId}
             />
             <SelectField
               label="공장"
-              options={['5공장', '1공장', '2공장']}
-              value={factory}
-              onChange={setFactory}
+              options={toOptions(factories)}
+              value={factoryId}
+              onChange={handleFactoryChange}
+              disabled={!siteId}
             />
             <SelectField
               label="라인"
-              options={['도장공정', 'A라인', 'B라인']}
-              value={line}
-              onChange={setLine}
+              options={toOptions(lines)}
+              value={lineId}
+              onChange={handleLineChange}
+              disabled={!factoryId}
             />
             <SelectField
               label="장비"
-              options={['A라인', 'B라인', 'C라인']}
-              value={equipment}
-              onChange={setEquipment}
-            />
-            <SelectField
-              label="측정포인트"
-              options={['A라인', 'B라인', 'C라인']}
-              value={measurePoint}
-              onChange={setMeasurePoint}
+              options={toOptions(equipment)}
+              value={equipmentId}
+              onChange={setEquipmentId}
+              disabled={!lineId}
             />
           </section>
 
@@ -169,19 +245,31 @@ export function Sidebar() {
 
             <SelectField
               label="영역"
-              options={['환경', '안전', '보건']}
+              options={[
+                { value: 'env', label: '환경' },
+                { value: 'safety', label: '안전' },
+                { value: 'health', label: '보건' },
+              ]}
               value={area}
               onChange={setArea}
             />
             <SelectField
               label="설비"
-              options={['대기', '수질', '토양']}
+              options={[
+                { value: 'air', label: '대기' },
+                { value: 'water', label: '수질' },
+                { value: 'soil', label: '토양' },
+              ]}
               value={facility}
               onChange={setFacility}
             />
             <SelectField
               label="센서"
-              options={['대기질', '대기월', '수질일']}
+              options={[
+                { value: 'air_day', label: '대기질' },
+                { value: 'air_month', label: '대기월' },
+                { value: 'water_day', label: '수질일' },
+              ]}
               value={sensor}
               onChange={setSensor}
             />

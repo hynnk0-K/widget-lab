@@ -5,11 +5,11 @@ import { api } from '@/shared/lib/api'
 import { useAuthStore } from '@/shared/store/auth'
 
 const NAV_ITEMS = [
-  { label: '실시간 모니터링', href: '/' },
-  { label: '상황대응', href: '/situation' },
-  { label: '현황/통계', href: '/statistics' },
-  { label: '서비스정보관리', href: '/service' },
-  { label: '시스템관리', href: '/dashboard' },
+  { label: '실시간 모니터링', href: '/', exact: true },
+  { label: '상황대응', href: '/situation', exact: true },
+  { label: '현황/통계', href: '/statistics', exact: true },
+  { label: '서비스정보관리', href: '/service/factory', exact: false },
+  { label: '시스템관리', href: '/system/company', exact: false },
 ]
 
 interface Props {
@@ -54,20 +54,25 @@ export function Header({ activeHref = '/' }: Props) {
 
       {/* Nav */}
       <nav className="flex items-center gap-0.5">
-        {NAV_ITEMS.map((item) => (
-          <a
-            key={item.href}
-            href={item.href}
-            className={cn(
-              'flex items-center px-3.5 py-1.5 text-[13px] rounded whitespace-nowrap transition-colors no-underline',
-              activeHref === item.href
-                ? 'bg-white/15 border border-white/25 text-white font-medium'
-                : 'text-white/65 hover:text-white hover:bg-white/10',
-            )}
-          >
-            {item.label}
-          </a>
-        ))}
+        {NAV_ITEMS.map((item) => {
+          const isActive = item.exact
+            ? activeHref === item.href
+            : activeHref.startsWith(item.href.split('/').slice(0, 2).join('/'))
+          return (
+            <a
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center px-3.5 py-1.5 text-[13px] rounded whitespace-nowrap transition-colors no-underline',
+                isActive
+                  ? 'bg-white/15 border border-white/25 text-white font-medium'
+                  : 'text-white/65 hover:text-white hover:bg-white/10',
+              )}
+            >
+              {item.label}
+            </a>
+          )
+        })}
       </nav>
 
       {/* Right */}
