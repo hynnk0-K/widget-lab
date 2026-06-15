@@ -195,9 +195,7 @@ export function HomePage() {
         </div>
       )}
 
-      {showModal && (
-        <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />
-      )}
+      {showModal && <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />}
     </div>
   )
 }

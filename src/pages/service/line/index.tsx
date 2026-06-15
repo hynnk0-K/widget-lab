@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
@@ -7,7 +8,10 @@ import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
 
-interface Process { id: number; name: string }
+interface Process {
+  id: number
+  name: string
+}
 interface Line {
   id: number
   process?: Process
@@ -18,24 +22,11 @@ interface Line {
   description?: string
 }
 
-const COLUMNS: Column[] = [
-  {
-    key: 'process',
-    label: '공정',
-    width: '160px',
-    render: (v, row) => {
-      const p = v as Process | undefined
-      return p?.name ?? (row.processName as string | undefined) ?? '-'
-    },
-  },
-  { key: 'code', label: '코드', width: '140px' },
-  { key: 'name', label: '이름' },
-  { key: 'description', label: '설명' },
-]
-
 const EMPTY: Record<string, string> = { processId: '', code: '', name: '', description: '' }
 
 export function LinePage() {
+  const navigate = useNavigate()
+
   const [rows, setRows] = useState<Line[]>([])
   const [loading, setLoading] = useState(true)
   const [processes, setProcesses] = useState<Process[]>([])
@@ -44,9 +35,54 @@ export function LinePage() {
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<Line[]>([])
 
+  const columns: Column[] = [
+    {
+      key: 'process',
+      label: '공정',
+      width: '160px',
+      render: (v, row) => {
+        const p = v as Process | undefined
+        return p?.name ?? (row.processName as string | undefined) ?? '-'
+      },
+    },
+    { key: 'code', label: '코드', width: '140px' },
+    { key: 'name', label: '이름' },
+    { key: 'description', label: '설명' },
+    {
+      key: 'actions',
+      label: '도면',
+      width: '100px',
+      render: (_v, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/service/line/${row.id}/map`)
+          }}
+          className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
+        >
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            viewBox="0 0 12 12"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <rect x="1" y="2" width="10" height="8" rx="1" />
+            <circle cx="4" cy="5" r="0.8" />
+            <path d="M1 8l3-3 2.5 2.5L8 6l3 3" />
+          </svg>
+          도면 보기
+        </button>
+      ),
+    },
+  ]
+
   useEffect(() => {
     loadRows()
-    api.get<Process[]>('/master/processes').then(setProcesses).catch(() => setProcesses([]))
+    api
+      .get<Process[]>('/master/processes')
+      .then(setProcesses)
+      .catch(() => setProcesses([]))
   }, [])
 
   async function loadRows() {
@@ -69,12 +105,22 @@ export function LinePage() {
   function openEdit(row: Record<string, unknown>) {
     const r = row as unknown as Line
     setEditTarget(r)
-    setFormValues({ processId: String(r.process?.id ?? r.processId ?? ''), code: r.code, name: r.name, description: r.description ?? '' })
+    setFormValues({
+      processId: String(r.process?.id ?? r.processId ?? ''),
+      code: r.code,
+      name: r.name,
+      description: r.description ?? '',
+    })
     setFormOpen(true)
   }
 
   async function handleSubmit() {
-    const body = { processId: Number(formValues.processId), code: formValues.code, name: formValues.name, description: formValues.description }
+    const body = {
+      processId: Number(formValues.processId),
+      code: formValues.code,
+      name: formValues.name,
+      description: formValues.description,
+    }
     if (editTarget) {
       await api.put(`/master/lines/${editTarget.id}`, body)
     } else {
@@ -93,7 +139,13 @@ export function LinePage() {
   }
 
   const fields: FormField[] = [
-    { key: 'processId', label: '공정', type: 'select', required: true, options: processes.map((p) => ({ value: String(p.id), label: p.name })) },
+    {
+      key: 'processId',
+      label: '공정',
+      type: 'select',
+      required: true,
+      options: processes.map((p) => ({ value: String(p.id), label: p.name })),
+    },
     { key: 'code', label: '코드', type: 'text', required: true, placeholder: 'LINE-001' },
     { key: 'name', label: '이름', type: 'text', required: true, placeholder: '라인명' },
     { key: 'description', label: '설명', type: 'textarea', placeholder: '설명 (선택)' },
@@ -102,7 +154,7 @@ export function LinePage() {
   return (
     <ManagementLayout section="service">
       <DataTable
-        columns={COLUMNS}
+        columns={columns}
         rows={rows as unknown as Record<string, unknown>[]}
         loading={loading}
         onAdd={openCreate}
@@ -122,7 +174,11 @@ export function LinePage() {
       )}
       {deleteTargets.length > 0 && (
         <ConfirmModal
-          message={deleteTargets.length === 1 ? `"${deleteTargets[0].name}" 라인을 삭제하시겠습니까?` : `선택한 ${deleteTargets.length}개 라인을 삭제하시겠습니까?`}
+          message={
+            deleteTargets.length === 1
+              ? `"${deleteTargets[0].name}" 라인을 삭제하시겠습니까?`
+              : `선택한 ${deleteTargets.length}개 라인을 삭제하시겠습니까?`
+          }
           detail="삭제 시 하위 설비 데이터에 영향을 줄 수 있습니다."
           onConfirm={handleDelete}
           onClose={() => setDeleteTargets([])}

@@ -7,9 +7,13 @@ import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
 import { FactoryPage } from '@/pages/service/factory'
+import { FactoryMapPage } from '@/pages/service/factory/[id]/map'
 import { ProcessPage } from '@/pages/service/process'
+import { ProcessMapPage } from '@/pages/service/process/[id]/map'
 import { LinePage } from '@/pages/service/line'
+import { LineMapPage } from '@/pages/service/line/[id]/map'
 import { FacilityPage } from '@/pages/service/facility'
+import { StatisticsPage } from '@/pages/statistics'
 import { CompanyPage } from '@/pages/system/company'
 import { SitePage } from '@/pages/system/site'
 
@@ -34,9 +38,13 @@ function App() {
                     <Route path="/" element={<HomePage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/service/factory" element={<FactoryPage />} />
+                    <Route path="/service/factory/:id/map" element={<FactoryMapPage />} />
                     <Route path="/service/process" element={<ProcessPage />} />
+                    <Route path="/service/process/:id/map" element={<ProcessMapPage />} />
                     <Route path="/service/line" element={<LinePage />} />
+                    <Route path="/service/line/:id/map" element={<LineMapPage />} />
                     <Route path="/service/facility" element={<FacilityPage />} />
+                    <Route path="/statistics" element={<StatisticsPage />} />
                     <Route path="/system/company" element={<CompanyPage />} />
                     <Route path="/system/site" element={<SitePage />} />
                   </Routes>

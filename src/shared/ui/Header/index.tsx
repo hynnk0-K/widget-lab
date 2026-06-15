@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { cn } from '@/shared/lib/cn'
 import { api } from '@/shared/lib/api'
 import { useAuthStore } from '@/shared/store/auth'
@@ -59,9 +59,9 @@ export function Header({ activeHref = '/' }: Props) {
             ? activeHref === item.href
             : activeHref.startsWith(item.href.split('/').slice(0, 2).join('/'))
           return (
-            <a
+            <Link
               key={item.href}
-              href={item.href}
+              to={item.href}
               className={cn(
                 'flex items-center px-3.5 py-1.5 text-[13px] rounded whitespace-nowrap transition-colors no-underline',
                 isActive
@@ -70,7 +70,7 @@ export function Header({ activeHref = '/' }: Props) {
               )}
             >
               {item.label}
-            </a>
+            </Link>
           )
         })}
       </nav>

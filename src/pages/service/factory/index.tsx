@@ -1,13 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
+import { FactoryImageModal } from './FactoryImageModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
 
-interface Site { id: number; name: string }
+interface Site {
+  id: number
+  name: string
+}
 interface Factory {
   id: number
   site?: Site
@@ -33,9 +38,49 @@ const COLUMNS: Column[] = [
   { key: 'description', label: '설명' },
 ]
 
+function buildColumns(
+  onShowImage: (row: Factory) => void,
+  navigate: (path: string) => void,
+): Column[] {
+  return [
+    ...COLUMNS,
+    {
+      key: 'image',
+      label: '도면',
+      width: '160px',
+      align: 'center',
+      render: (_, row) => (
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onShowImage(row as unknown as Factory)
+            }}
+            className="h-7 px-3 border border-slate-200 rounded-lg text-[12px] text-slate-600 font-medium hover:bg-slate-50 transition-colors"
+          >
+            보기
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/service/factory/${(row as { id: number }).id}/map`)
+            }}
+            className="h-7 px-3 border border-[#003087] text-[#003087] rounded-lg text-[12px] font-medium hover:bg-blue-50 transition-colors"
+          >
+            편집
+          </button>
+        </div>
+      ),
+    },
+  ]
+}
+
 const EMPTY: Record<string, string> = { siteId: '', code: '', name: '', description: '' }
 
 export function FactoryPage() {
+  const navigate = useNavigate()
   const [rows, setRows] = useState<Factory[]>([])
   const [loading, setLoading] = useState(true)
   const [sites, setSites] = useState<Site[]>([])
@@ -43,10 +88,16 @@ export function FactoryPage() {
   const [editTarget, setEditTarget] = useState<Factory | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<Factory[]>([])
+  const [imageTarget, setImageTarget] = useState<Factory | null>(null)
+
+  const columns = useMemo(() => buildColumns(setImageTarget, navigate), [navigate])
 
   useEffect(() => {
     loadRows()
-    api.get<Site[]>('/master/sites').then(setSites).catch(() => setSites([]))
+    api
+      .get<Site[]>('/master/sites')
+      .then(setSites)
+      .catch(() => setSites([]))
   }, [])
 
   async function loadRows() {
@@ -69,12 +120,22 @@ export function FactoryPage() {
   function openEdit(row: Record<string, unknown>) {
     const r = row as unknown as Factory
     setEditTarget(r)
-    setFormValues({ siteId: String(r.site?.id ?? r.siteId ?? ''), code: r.code, name: r.name, description: r.description ?? '' })
+    setFormValues({
+      siteId: String(r.site?.id ?? r.siteId ?? ''),
+      code: r.code,
+      name: r.name,
+      description: r.description ?? '',
+    })
     setFormOpen(true)
   }
 
   async function handleSubmit() {
-    const body = { siteId: Number(formValues.siteId), code: formValues.code, name: formValues.name, description: formValues.description }
+    const body = {
+      siteId: Number(formValues.siteId),
+      code: formValues.code,
+      name: formValues.name,
+      description: formValues.description,
+    }
     if (editTarget) {
       await api.put(`/master/factories/${editTarget.id}`, body)
     } else {
@@ -93,7 +154,13 @@ export function FactoryPage() {
   }
 
   const fields: FormField[] = [
-    { key: 'siteId', label: '사업장', type: 'select', required: true, options: sites.map((s) => ({ value: String(s.id), label: s.name })) },
+    {
+      key: 'siteId',
+      label: '사업장',
+      type: 'select',
+      required: true,
+      options: sites.map((s) => ({ value: String(s.id), label: s.name })),
+    },
     { key: 'code', label: '코드', type: 'text', required: true, placeholder: 'FACT-001' },
     { key: 'name', label: '이름', type: 'text', required: true, placeholder: '공장명' },
     { key: 'description', label: '설명', type: 'textarea', placeholder: '설명 (선택)' },
@@ -102,7 +169,7 @@ export function FactoryPage() {
   return (
     <ManagementLayout section="service">
       <DataTable
-        columns={COLUMNS}
+        columns={columns}
         rows={rows as unknown as Record<string, unknown>[]}
         loading={loading}
         onAdd={openCreate}
@@ -122,10 +189,21 @@ export function FactoryPage() {
       )}
       {deleteTargets.length > 0 && (
         <ConfirmModal
-          message={deleteTargets.length === 1 ? `"${deleteTargets[0].name}" 공장을 삭제하시겠습니까?` : `선택한 ${deleteTargets.length}개 공장을 삭제하시겠습니까?`}
+          message={
+            deleteTargets.length === 1
+              ? `"${deleteTargets[0].name}" 공장을 삭제하시겠습니까?`
+              : `선택한 ${deleteTargets.length}개 공장을 삭제하시겠습니까?`
+          }
           detail="삭제 시 하위 공정 데이터에 영향을 줄 수 있습니다."
           onConfirm={handleDelete}
           onClose={() => setDeleteTargets([])}
+        />
+      )}
+      {imageTarget && (
+        <FactoryImageModal
+          factoryId={imageTarget.id}
+          factoryName={imageTarget.name}
+          onClose={() => setImageTarget(null)}
         />
       )}
     </ManagementLayout>

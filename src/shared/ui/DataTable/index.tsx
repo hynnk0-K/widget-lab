@@ -149,8 +149,8 @@ export function DataTable({
       </div>
 
       {/* 테이블 */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[13px]">
+      <div className="overflow-x-auto px-2 py-2">
+        <table className="w-full border-collapse text-[13px] rounded-lg overflow-hidden">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="w-10 px-4 py-2.5">
