@@ -267,8 +267,8 @@ export function Sidebar() {
               label="센서"
               options={[
                 { value: 'air_day', label: '대기질' },
-                { value: 'air_month', label: '대기월' },
-                { value: 'water_day', label: '수질일' },
+                { value: 'air_month', label: '대기' },
+                { value: 'water_day', label: '수질' },
               ]}
               value={sensor}
               onChange={setSensor}
