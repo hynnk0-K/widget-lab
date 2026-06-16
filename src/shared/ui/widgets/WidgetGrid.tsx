@@ -4,6 +4,11 @@ import 'react-grid-layout/css/styles.css'
 import { cn } from '@/shared/lib/cn'
 import { GaugeWidget } from './GaugeWidget'
 import { TrendWidget } from './TrendWidget'
+import { StatCard } from './StatCard'
+import { StatusBadge } from './StatusBadge'
+import { CounterCard } from './CounterCard'
+import { MiniBar } from './MiniBar'
+import { HeatmapHour } from './HeatmapHour'
 import type { DashboardLayout, Widget } from './types'
 
 interface Props {
@@ -76,6 +81,11 @@ export function WidgetGrid({ layout, editMode, onRemove, onLayoutChange }: Props
               <div className="h-full overflow-hidden rounded-xl">
                 {widget.type === 'gauge' && <GaugeWidget widget={widget} />}
                 {widget.type === 'trend' && <TrendWidget widget={widget} />}
+                {widget.type === 'stat' && <StatCard widget={widget} />}
+                {widget.type === 'status' && <StatusBadge widget={widget} />}
+                {widget.type === 'counter' && <CounterCard widget={widget} />}
+                {widget.type === 'minibar' && <MiniBar widget={widget} />}
+                {widget.type === 'heatmap' && <HeatmapHour widget={widget} />}
               </div>
 
               {editMode && (

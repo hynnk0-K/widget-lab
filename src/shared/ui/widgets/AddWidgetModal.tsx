@@ -63,11 +63,24 @@ const GAUGE_CONFIG: Record<string, { min: number; max: number; warningAt: number
 }
 
 const DEFAULT_GAUGE = { min: 0, max: 100, warningAt: 80 }
-const DEFAULT_SIZE = { gauge: { w: 3, h: 2 }, trend: { w: 6, h: 3 } }
+const DEFAULT_SIZE = {
+  gauge: { w: 3, h: 2 },
+  trend: { w: 6, h: 3 },
+  stat: { w: 3, h: 2 },
+  status: { w: 3, h: 2 },
+  counter: { w: 3, h: 3 },
+  minibar: { w: 6, h: 3 },
+  heatmap: { w: 6, h: 3 },
+}
 
 const WIDGET_TYPES: { value: WidgetType; label: string; desc: string }[] = [
   { value: 'gauge', label: '게이지', desc: '현재 값을 반원 계기판으로 표시' },
   { value: 'trend', label: '추이', desc: '시간에 따른 변화를 꺾은선으로 표시' },
+  { value: 'stat', label: '수치 카드', desc: '큰 숫자 + 기간 평균 대비 변화율' },
+  { value: 'status', label: '상태', desc: '가동·정지·알람 색깔 배지' },
+  { value: 'counter', label: '카운터', desc: '양품/불량 같이 표시' },
+  { value: 'minibar', label: '시간별 막대', desc: '24시간 시간별 평균 막대그래프' },
+  { value: 'heatmap', label: '요일×시간 히트맵', desc: '1주일 가동 패턴 시각화' },
 ]
 
 const TYPE_LABEL: Record<string, string> = {
@@ -161,14 +174,68 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!title.trim() || !deviceCode || !metric) return
+
+    // 타입별 기본 config 생성
+    let config: any
+    if (widgetType === 'gauge') {
+      config = GAUGE_CONFIG[metric] ?? DEFAULT_GAUGE
+    } else if (widgetType === 'trend') {
+      config = { hours: 6, intervalMinutes: 5 }
+    } else if (widgetType === 'stat') {
+      // metric별 적절한 unit 추정
+      const unitMap: Record<string, string> = {
+        spindle_rpm: 'rpm',
+        spindle_load: '%',
+        vibration: 'mm/s',
+        motor_temp: '°C',
+        discharge_pressure: 'bar',
+        suction_temp: '°C',
+        discharge_temp: '°C',
+        motor_current: 'A',
+        active_power: 'kW',
+        energy_kwh: 'kWh',
+      }
+      config = { decimals: 1, unit: unitMap[metric] ?? '', trendHours: 24 }
+    } else if (widgetType === 'status') {
+      // run_state 가정 — CNC와 압축기 다름
+      if (deviceCode.startsWith('cnc')) {
+        config = {
+          states: {
+            0: { label: '정지', color: 'gray' },
+            1: { label: '대기', color: 'yellow' },
+            2: { label: '가동', color: 'green' },
+            3: { label: '알람', color: 'red' },
+          },
+        }
+      } else {
+        config = {
+          states: {
+            0: { label: '정지', color: 'gray' },
+            1: { label: '무부하', color: 'yellow' },
+            2: { label: '가동', color: 'green' },
+          },
+        }
+      }
+    } else if (widgetType === 'counter') {
+      // CNC 양품/불량 자동 매핑
+      config = {
+        secondaryMetric: metric === 'good_count' ? 'reject_count' : 'good_count',
+        primaryLabel: metric === 'good_count' ? '양품' : '불량',
+        secondaryLabel: metric === 'good_count' ? '불량' : '양품',
+      }
+    } else if (widgetType === 'minibar') {
+      config = { hours: 24, intervalMinutes: 60 }
+    } else if (widgetType === 'heatmap') {
+      config = { days: 7 }
+    } else {
+      config = {}
+    }
+
     onAdd({
       type: widgetType,
       title: title.trim(),
       source: { device: deviceCode, metric },
-      config:
-        widgetType === 'gauge'
-          ? (GAUGE_CONFIG[metric] ?? DEFAULT_GAUGE)
-          : { hours: 6, intervalMinutes: 5 },
+      config,
       x: 0,
       y: 999,
       ...DEFAULT_SIZE[widgetType],
