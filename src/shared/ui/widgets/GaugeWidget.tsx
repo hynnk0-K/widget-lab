@@ -88,7 +88,10 @@ export function GaugeWidget({ widget }: Props) {
           <span className="text-[11px] text-slate-400">{widget.source.device}</span>
           {/* 실시간 표시 점 */}
           {value !== null && (
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" title="실시간 연결됨" />
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"
+              title="실시간 연결됨"
+            />
           )}
         </div>
       </div>
@@ -101,24 +104,46 @@ export function GaugeWidget({ widget }: Props) {
             <span className="text-[12px]">연결 중...</span>
           </div>
         ) : (
-          <svg viewBox="0 0 160 120" className="w-full max-w-[180px]">
+          <svg viewBox="0 0 160 180" className="w-full max-w-[180px]">
             {/* 배경 트랙 */}
-            <path d={arcPath(START_DEG, bgEnd)} fill="none" stroke="#e2e8f0" strokeWidth="10" strokeLinecap="round" />
+            <path
+              d={arcPath(START_DEG, bgEnd)}
+              fill="none"
+              stroke="#e2e8f0"
+              strokeWidth="10"
+              strokeLinecap="round"
+            />
 
             {/* 값 호 */}
             {pct > 0 && (
-              <path d={arcPath(START_DEG, valueDeg)} fill="none" stroke={valueColor} strokeWidth="10" strokeLinecap="round" />
+              <path
+                d={arcPath(START_DEG, valueDeg)}
+                fill="none"
+                stroke={valueColor}
+                strokeWidth="10"
+                strokeLinecap="round"
+              />
             )}
 
             {/* 눈금 */}
             {ticks.map((t, i) => (
               <g key={i}>
                 <line
-                  x1={t.inner.x.toFixed(2)} y1={t.inner.y.toFixed(2)}
-                  x2={t.outer.x.toFixed(2)} y2={t.outer.y.toFixed(2)}
-                  stroke="#94a3b8" strokeWidth="1.5"
+                  x1={t.inner.x.toFixed(2)}
+                  y1={t.inner.y.toFixed(2)}
+                  x2={t.outer.x.toFixed(2)}
+                  y2={t.outer.y.toFixed(2)}
+                  stroke="#94a3b8"
+                  strokeWidth="1.5"
                 />
-                <text x={t.label.x.toFixed(2)} y={t.label.y.toFixed(2)} textAnchor="middle" dominantBaseline="middle" fontSize="7" fill="#94a3b8">
+                <text
+                  x={t.label.x.toFixed(2)}
+                  y={t.label.y.toFixed(2)}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="7"
+                  fill="#94a3b8"
+                >
                   {t.val}
                 </text>
               </g>
@@ -130,7 +155,14 @@ export function GaugeWidget({ widget }: Props) {
             <circle cx={CX} cy={CY} r="2.5" fill="white" />
 
             {/* 수치 */}
-            <text x={CX} y={CY + 20} textAnchor="middle" fontSize="16" fontWeight="700" fill={valueColor}>
+            <text
+              x={CX}
+              y={CY + 20}
+              textAnchor="middle"
+              fontSize="16"
+              fontWeight="700"
+              fill={valueColor}
+            >
               {displayValue.toFixed(1)}
             </text>
             <text x={CX} y={CY + 30} textAnchor="middle" fontSize="7" fill="#94a3b8">

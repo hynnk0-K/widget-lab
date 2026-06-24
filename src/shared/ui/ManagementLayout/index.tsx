@@ -7,10 +7,14 @@ interface Tab {
   href: string
 }
 
-const SECTION_CONFIG: Record<
-  'service' | 'system',
-  { label: string; tabs: Tab[] }
-> = {
+const SECTION_CONFIG: Record<'situation' | 'service' | 'system', { label: string; tabs: Tab[] }> = {
+  situation: {
+    label: '상황대응',
+    tabs: [
+      { label: '알람/이벤트', href: '/situation/alarm' },
+      { label: '사고/인시던트', href: '/situation/incident' },
+    ],
+  },
   service: {
     label: '서비스정보관리',
     tabs: [
@@ -33,6 +37,8 @@ const SECTION_CONFIG: Record<
 }
 
 const IMPLEMENTED = new Set([
+  '/situation/alarm',
+  '/situation/incident',
   '/service/factory',
   '/service/process',
   '/service/line',
@@ -42,7 +48,7 @@ const IMPLEMENTED = new Set([
 ])
 
 interface Props {
-  section: 'service' | 'system'
+  section: 'situation' | 'service' | 'system'
   children: ReactNode
 }
 
