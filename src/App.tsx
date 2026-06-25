@@ -6,6 +6,8 @@ import { useAuthStore } from '@/shared/store/auth'
 import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
+import { AlarmPage } from '@/pages/situation/alarm'
+import { AlarmRealtimePage } from '@/pages/situation/alarm/realtime'
 import { FactoryPage } from '@/pages/service/factory'
 import { FactoryMapPage } from '@/pages/service/factory/[id]/map'
 import { ProcessPage } from '@/pages/service/process'
@@ -37,6 +39,8 @@ function App() {
                   <Routes>
                     <Route path="/" element={<HomePage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/situation/alarm" element={<AlarmPage />} />
+                    <Route path="/situation/alarm/realtime" element={<AlarmRealtimePage />} />
                     <Route path="/service/factory" element={<FactoryPage />} />
                     <Route path="/service/factory/:id/map" element={<FactoryMapPage />} />
                     <Route path="/service/process" element={<ProcessPage />} />

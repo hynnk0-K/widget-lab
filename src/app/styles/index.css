@@ -84,7 +84,9 @@
   border-right: 2.5px solid #94a3b8;
   border-radius: 0 0 8px 0;
   opacity: 0;
-  transition: opacity 0.15s, border-color 0.15s;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
   cursor: se-resize;
   z-index: 10;
 }
@@ -102,4 +104,28 @@
   box-shadow: 0 12px 32px rgba(0, 48, 135, 0.18);
   opacity: 0.92;
   z-index: 100;
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes snackbar-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
 }

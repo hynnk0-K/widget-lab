@@ -6,7 +6,7 @@ import { useAuthStore } from '@/shared/store/auth'
 
 const NAV_ITEMS = [
   { label: '실시간 모니터링', href: '/', exact: true },
-  { label: '상황대응', href: '/situation', exact: true },
+  { label: '상황대응', href: '/situation/alarm', exact: false },
   { label: '현황/통계', href: '/statistics', exact: true },
   { label: '서비스정보관리', href: '/service/factory', exact: false },
   { label: '시스템관리', href: '/system/company', exact: false },
@@ -145,9 +145,7 @@ export function Header({ activeHref = '/' }: Props) {
             <div className="w-7 h-7 bg-[#003087] border border-white/30 rounded-full flex items-center justify-center text-white text-[11px] font-bold flex-shrink-0">
               {initials(user?.displayName ?? '')}
             </div>
-            <span className="text-[13px] text-white font-medium">
-              {user?.displayName ?? ''}
-            </span>
+            <span className="text-[13px] text-white font-medium">{user?.displayName ?? ''}</span>
             <svg
               className="w-3 h-3 text-white/50"
               fill="none"

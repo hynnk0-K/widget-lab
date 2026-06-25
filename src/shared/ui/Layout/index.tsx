@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Header } from '@/shared/ui/Header'
 import { Sidebar } from '@/shared/ui/Sidebar'
+import { AlarmSnackbarContainer } from '@/shared/ui/AlarmSnackbar'
 
 interface Props {
   children: ReactNode
@@ -17,6 +18,7 @@ export function Layout({ children }: Props) {
         <Sidebar />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      <AlarmSnackbarContainer />
     </div>
   )
 }

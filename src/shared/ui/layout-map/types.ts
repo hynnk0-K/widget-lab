@@ -9,7 +9,11 @@ export interface MapPin {
   code: string
   name: string
   position: { x: number; y: number } | null
-  live?: MapPinLive
+  live?: {
+    hasData: boolean
+    lastValueLabel?: string
+  }
+  alarmStatus?: 'critical' | 'warning' | null // ← 추가
 }
 
 export interface MapImage {

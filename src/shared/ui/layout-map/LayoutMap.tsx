@@ -277,8 +277,23 @@ function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinVie
   const x = currentPos.x * scale
   const y = currentPos.y * scale
 
+  // const hasLive = pin.live?.hasData
+  // const pinColor = hasLive ? 'bg-green-500' : 'bg-slate-400'
   const hasLive = pin.live?.hasData
-  const pinColor = hasLive ? 'bg-green-500' : 'bg-slate-400'
+  const alarmStatus = pin.alarmStatus
+
+  // 알람 우선: critical > warning > 실시간 데이터 여부
+  const pinColor =
+    alarmStatus === 'critical'
+      ? 'bg-red-500'
+      : alarmStatus === 'warning'
+        ? 'bg-amber-500'
+        : hasLive
+          ? 'bg-green-500'
+          : 'bg-slate-400'
+
+  // 펄스 애니메이션도 알람 발생 시
+  const showPulse = alarmStatus === 'critical' || alarmStatus === 'warning' || hasLive
 
   // 드래그 시작
   function handleMouseDown(e: React.MouseEvent) {
@@ -369,7 +384,10 @@ function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinVie
           .filter(Boolean)
           .join(' ')}
       >
-        {hasLive && !dragging && (
+        {/* {hasLive && !dragging && (
+          <span className={`absolute inset-0 ${pinColor} rounded-full animate-ping opacity-50`} />
+        )} */}
+        {showPulse && !dragging && (
           <span className={`absolute inset-0 ${pinColor} rounded-full animate-ping opacity-50`} />
         )}
         <span
@@ -388,6 +406,13 @@ function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinVie
           <div className="text-slate-300 text-[10px]">{pin.code}</div>
           {pin.live?.lastValueLabel && (
             <div className="text-green-300 text-[10px] mt-0.5">{pin.live.lastValueLabel}</div>
+          )}
+          {/* ← 추가: 알람 상태 표시 */}
+          {pin.alarmStatus === 'critical' && (
+            <div className="text-red-300 text-[10px] mt-0.5 font-semibold">⚠ 심각 알람</div>
+          )}
+          {pin.alarmStatus === 'warning' && (
+            <div className="text-amber-300 text-[10px] mt-0.5 font-semibold">⚠ 주의 알람</div>
           )}
           <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-slate-900" />
         </div>
