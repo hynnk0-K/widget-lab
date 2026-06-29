@@ -79,8 +79,8 @@ function AlarmSnackbar({ id, alarm }: Props) {
   }, [id, remove])
 
   function handleClick() {
-    // 알람 페이지로 이동 + URL 파라미터로 선택할 알람 ID 전달
-    navigate(`/situation/alarm?alarmId=${alarm.alarmId}`)
+    // 실시간 모니터링 탭으로 이동 + URL 파라미터로 선택할 알람 ID 전달
+    navigate(`/situation/alarm/realtime?alarmId=${alarm.alarmId}`)
     remove(id)
   }
 

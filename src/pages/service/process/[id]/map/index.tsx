@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
+import { DiagramMap } from '@/shared/ui/diagram-map'
+import {
+  loadMapMode,
+  saveMapMode,
+  loadDiagram,
+  saveDiagram,
+  type MapMode,
+} from '@/shared/lib/diagramStorage'
 
 interface ProcessDto {
   id: number
@@ -60,6 +68,8 @@ export function ProcessMapPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
+  const [mode, setMode] = useState<MapMode>(() => loadMapMode('process', processId))
+  const [diagram, setDiagram] = useState(() => loadDiagram('process', processId))
 
   useEffect(() => {
     if (!processId || Number.isNaN(processId)) return
@@ -187,6 +197,30 @@ export function ProcessMapPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex border border-slate-200 rounded-lg overflow-hidden text-[12px]">
+            <button
+              onClick={() => {
+                setMode('image')
+                saveMapMode('process', processId, 'image')
+              }}
+              className={`h-8 px-3 transition-colors ${
+                mode === 'image' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              이미지
+            </button>
+            <button
+              onClick={() => {
+                setMode('diagram')
+                saveMapMode('process', processId, 'diagram')
+              }}
+              className={`h-8 px-3 transition-colors border-l border-slate-200 ${
+                mode === 'diagram' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              다이어그램
+            </button>
+          </div>
           {editMode ? (
             <button
               onClick={() => setEditMode(false)}
@@ -218,15 +252,28 @@ export function ProcessMapPage() {
         </div>
       </div>
 
-      <LayoutMap
-        image={image}
-        pins={pins}
-        editMode={editMode}
-        onImageUpload={handleImageUpload}
-        onImageDelete={handleImageDelete}
-        onPinMove={handlePinMove}
-        onPinClick={handlePinClick}
-      />
+      {mode === 'image' ? (
+        <LayoutMap
+          image={image}
+          pins={pins}
+          editMode={editMode}
+          onImageUpload={handleImageUpload}
+          onImageDelete={handleImageDelete}
+          onPinMove={handlePinMove}
+          onPinClick={handlePinClick}
+        />
+      ) : (
+        <DiagramMap
+          nodes={diagram.nodes}
+          edges={diagram.edges}
+          editMode={editMode}
+          onChange={(nodes, edges) => {
+            const next = { nodes, edges }
+            setDiagram(next)
+            saveDiagram('process', processId, next)
+          }}
+        />
+      )}
     </div>
   )
 }

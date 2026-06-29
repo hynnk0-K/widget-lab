@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/shared/lib/api'
-import { METRIC_LABELS, type EquipmentLive } from '.'
+import { METRIC_LABELS, type EquipmentLive } from './types'
 
 interface EquipmentLiveDetail {
   id: number

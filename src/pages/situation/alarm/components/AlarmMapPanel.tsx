@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/shared/lib/api'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
-import type { Alarm } from '../types'
+import { DiagramMap } from '@/shared/ui/diagram-map'
+import { loadMapMode, loadDiagram } from '@/shared/lib/diagramStorage'
+import type { Alarm, EquipmentDto } from '../types'
 
 interface LineDto {
   id: number
@@ -16,16 +18,6 @@ interface LayoutImageDto {
   height: number | null
 }
 
-interface EquipmentDto {
-  id: number
-  lineId: number
-  code: string
-  name: string
-  equipmentType: string | null
-  position: string | null
-  isActive: boolean
-}
-
 interface Props {
   alarms: Alarm[]
   selectedAlarmId: number | null
@@ -33,6 +25,8 @@ interface Props {
   selectedLineId: number | null
   onLineChange: (lineId: number) => void
   onEquipmentsLoaded: (equipments: EquipmentDto[]) => void
+  /** 선택된 알람이 속한 라인 — 일치하는 라인으로 자동 전환 */
+  targetLine?: string | null
 }
 
 function parsePosition(raw: string | null): { x: number; y: number } | null {
@@ -53,6 +47,7 @@ export function AlarmMapPanel({
   selectedLineId,
   onLineChange,
   onEquipmentsLoaded,
+  targetLine,
 }: Props) {
   const [lines, setLines] = useState<LineDto[]>([])
   //   const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
@@ -69,6 +64,20 @@ export function AlarmMapPanel({
       }
     })
   }, []) // 처음 한 번만
+
+  // 스낵바 클릭 등으로 다른 라인의 알람이 선택되면 해당 라인으로 전환
+  // targetLine(알람 선택)이 바뀔 때만 동작 — selectedLineId를 deps에 넣으면
+  // 사용자가 수동으로 다른 라인을 고른 직후 다시 덮어써버린다
+  useEffect(() => {
+    if (!targetLine || lines.length === 0) return
+    const match = lines.find(
+      (l) => l.code.toLowerCase() === targetLine.toLowerCase() || l.name === targetLine,
+    )
+    if (match && match.id !== selectedLineId) {
+      onLineChange(match.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetLine, lines])
 
   // 선택된 라인의 도면 + 설비 로드
   useEffect(() => {
@@ -122,8 +131,19 @@ export function AlarmMapPanel({
       position: parsePosition(eq.position),
       live: { hasData: eq.isActive },
       alarmStatus: alarmStatusByDevice[eq.code] ?? null,
+      selected: eq.code === selectedDeviceCode,
     }))
-  }, [equipments, alarmStatusByDevice])
+  }, [equipments, alarmStatusByDevice, selectedDeviceCode])
+
+  // 해당 라인이 다이어그램(P&ID) 모드로 그려져 있으면 그걸로 표시
+  const mapMode = useMemo(
+    () => (selectedLineId ? loadMapMode('line', selectedLineId) : 'image'),
+    [selectedLineId],
+  )
+  const diagram = useMemo(
+    () => (selectedLineId ? loadDiagram('line', selectedLineId) : { nodes: [], edges: [] }),
+    [selectedLineId],
+  )
 
   function handlePinClick(pinId: number | string) {
     const eq = equipments.find((e) => e.id === pinId)
@@ -179,6 +199,14 @@ export function AlarmMapPanel({
           <div className="flex items-center justify-center h-full text-sm text-slate-400">
             도면 불러오는 중...
           </div>
+        ) : mapMode === 'diagram' ? (
+          <DiagramMap
+            nodes={diagram.nodes}
+            edges={diagram.edges}
+            editMode={false}
+            alarmStatusByDevice={alarmStatusByDevice}
+            selectedDeviceCode={selectedDeviceCode}
+          />
         ) : (
           <LayoutMap image={image} pins={pins} editMode={false} onPinClick={handlePinClick} />
         )}

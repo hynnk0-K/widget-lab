@@ -21,6 +21,16 @@ export interface Alarm {
   note?: string | null
 }
 
+export interface EquipmentDto {
+  id: number
+  lineId: number
+  code: string
+  name: string
+  equipmentType: string | null
+  position: string | null
+  isActive: boolean
+}
+
 export interface AlarmSummary {
   total: number
   critical: number

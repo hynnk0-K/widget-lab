@@ -22,47 +22,49 @@ interface Process {
   description?: string
 }
 
-const columns: Column[] = [
-  {
-    key: 'factory',
-    label: '공장',
-    width: '160px',
-    render: (v, row) => {
-      const f = v as Factory | undefined
-      return f?.name ?? (row.factoryName as string | undefined) ?? '-'
+function buildColumns(navigate: (path: string) => void): Column[] {
+  return [
+    {
+      key: 'factory',
+      label: '공장',
+      width: '160px',
+      render: (v, row) => {
+        const f = v as Factory | undefined
+        return f?.name ?? (row.factoryName as string | undefined) ?? '-'
+      },
     },
-  },
-  { key: 'code', label: '코드', width: '140px' },
-  { key: 'name', label: '이름' },
-  { key: 'description', label: '설명' },
-  {
-    key: 'actions',
-    label: '도면',
-    width: '100px',
-    render: (_v, row) => (
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          navigate(`/service/process/${row.id}/map`)
-        }}
-        className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
-      >
-        <svg
-          className="w-3 h-3"
-          fill="none"
-          viewBox="0 0 12 12"
-          stroke="currentColor"
-          strokeWidth={2}
+    { key: 'code', label: '코드', width: '140px' },
+    { key: 'name', label: '이름' },
+    { key: 'description', label: '설명' },
+    {
+      key: 'actions',
+      label: '도면',
+      width: '100px',
+      render: (_v, row) => (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/service/process/${row.id}/map`)
+          }}
+          className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
         >
-          <rect x="1" y="2" width="10" height="8" rx="1" />
-          <circle cx="4" cy="5" r="0.8" />
-          <path d="M1 8l3-3 2.5 2.5L8 6l3 3" />
-        </svg>
-        도면 보기
-      </button>
-    ),
-  },
-]
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            viewBox="0 0 12 12"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <rect x="1" y="2" width="10" height="8" rx="1" />
+            <circle cx="4" cy="5" r="0.8" />
+            <path d="M1 8l3-3 2.5 2.5L8 6l3 3" />
+          </svg>
+          도면 보기
+        </button>
+      ),
+    },
+  ]
+}
 
 const EMPTY: Record<string, string> = { factoryId: '', code: '', name: '', description: '' }
 
@@ -76,6 +78,7 @@ export function ProcessPage() {
   const [deleteTargets, setDeleteTargets] = useState<Process[]>([])
 
   const navigate = useNavigate()
+  const columns = buildColumns(navigate)
 
   useEffect(() => {
     loadRows()

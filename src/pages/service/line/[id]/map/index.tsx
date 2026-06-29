@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
+import { DiagramMap } from '@/shared/ui/diagram-map'
+import {
+  loadMapMode,
+  saveMapMode,
+  loadDiagram,
+  saveDiagram,
+  type MapMode,
+} from '@/shared/lib/diagramStorage'
 
 // ── 백엔드 DTO 타입 ─────────────────────────────────
 interface LineDto {
@@ -81,7 +89,6 @@ export function LineMapPage() {
   const navigate = useNavigate()
   const lineId = Number(id)
 
-  const [rows, setRows] = useState<Line[]>([])
   const [line, setLine] = useState<LineDto | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
   const [equipments, setEquipments] = useState<EquipmentDto[]>([])
@@ -92,6 +99,8 @@ export function LineMapPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
+  const [mode, setMode] = useState<MapMode>(() => loadMapMode('line', lineId))
+  const [diagram, setDiagram] = useState(() => loadDiagram('line', lineId))
 
   // ── 초기 로딩 — 라인 정보 + 도면 + 설비 + 실시간 상태 ──
   useEffect(() => {
@@ -288,6 +297,30 @@ export function LineMapPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex border border-slate-200 rounded-lg overflow-hidden text-[12px]">
+            <button
+              onClick={() => {
+                setMode('image')
+                saveMapMode('line', lineId, 'image')
+              }}
+              className={`h-8 px-3 transition-colors ${
+                mode === 'image' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              이미지
+            </button>
+            <button
+              onClick={() => {
+                setMode('diagram')
+                saveMapMode('line', lineId, 'diagram')
+              }}
+              className={`h-8 px-3 transition-colors border-l border-slate-200 ${
+                mode === 'diagram' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              다이어그램
+            </button>
+          </div>
           {editMode ? (
             <button
               onClick={() => setEditMode(false)}
@@ -320,15 +353,29 @@ export function LineMapPage() {
       </div>
 
       {/* 도면 + 핀 */}
-      <LayoutMap
-        image={image}
-        pins={pins}
-        editMode={editMode}
-        onImageUpload={handleImageUpload}
-        onImageDelete={handleImageDelete}
-        onPinMove={handlePinMove}
-        onPinClick={handlePinClick}
-      />
+      {mode === 'image' ? (
+        <LayoutMap
+          image={image}
+          pins={pins}
+          editMode={editMode}
+          onImageUpload={handleImageUpload}
+          onImageDelete={handleImageDelete}
+          onPinMove={handlePinMove}
+          onPinClick={handlePinClick}
+        />
+      ) : (
+        <DiagramMap
+          nodes={diagram.nodes}
+          edges={diagram.edges}
+          editMode={editMode}
+          equipmentOptions={equipments.map((eq) => ({ code: eq.code, name: eq.name }))}
+          onChange={(nodes, edges) => {
+            const next = { nodes, edges }
+            setDiagram(next)
+            saveDiagram('line', lineId, next)
+          }}
+        />
+      )}
     </div>
   )
 }

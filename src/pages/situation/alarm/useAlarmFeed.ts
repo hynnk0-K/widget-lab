@@ -1,28 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ManagementLayout } from '@/shared/ui/ManagementLayout'
-import { AlarmSummaryCard } from './components/AlarmSummaryCard'
-import { AlarmListPanel } from './components/AlarmListPanel'
-import { AlarmMapPanel } from './components/AlarmMapPanel'
 import { fetchAlarms } from '@/shared/api/alarm'
 import { useSnackbarStore } from '@/shared/store/snackbar'
-import type { Alarm } from './types'
-
-// EquipmentDto는 AlarmMapPanel에서도 쓰는 타입이라 별도 파일로 빼는 게 깔끔하지만
-// 일단 여기 inline
-interface EquipmentDto {
-  id: number
-  lineId: number
-  code: string
-  name: string
-  equipmentType: string | null
-  position: string | null
-  isActive: boolean
-}
+import type { Alarm, EquipmentDto } from './types'
 
 const POLL_INTERVAL_MS = 5000
 
-export function AlarmPage() {
+export function useAlarmFeed() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [allAlarms, setAllAlarms] = useState<Alarm[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -71,6 +55,12 @@ export function AlarmPage() {
     }
   }, [push])
 
+  // ── 선택된 알람 (라인 필터와 무관하게 항상 전체 목록 기준) ──
+  const selectedAlarm = useMemo(() => {
+    if (selectedId === null) return null
+    return allAlarms.find((a) => a.alarmId === selectedId) ?? null
+  }, [allAlarms, selectedId])
+
   // ── 선택된 라인의 설비 코드 set ──
   const deviceCodesInLine = useMemo(() => {
     return new Set(lineEquipments.map((eq) => eq.code))
@@ -85,7 +75,7 @@ export function AlarmPage() {
     return allAlarms.filter((a) => deviceCodesInLine.has(a.deviceCode))
   }, [allAlarms, deviceCodesInLine])
 
-  // URL ?alarmId=xxx 처리
+  // URL ?alarmId=xxx 처리 (스낵바 클릭 등으로 진입)
   useEffect(() => {
     const alarmIdParam = searchParams.get('alarmId')
     if (alarmIdParam && allAlarms.length > 0) {
@@ -109,53 +99,21 @@ export function AlarmPage() {
 
   function handleLineChange(lineId: number) {
     setSelectedLineId(lineId)
-    setSelectedId(null) // 라인 바뀌면 선택 알람 초기화
+    // 선택된 알람은 유지 — 라인 전환이 알람 선택(스낵바 클릭 등)에 의해 자동으로 일어날 수 있어서
+    // 여기서 선택을 초기화하면 막 선택한 알람이 곧바로 풀려버린다
   }
 
-  if (loading) {
-    return (
-      <ManagementLayout section="situation">
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-6 h-6 border-2 border-[#003087] border-t-transparent rounded-full animate-spin" />
-            <span className="text-[13px] text-slate-400">알람 불러오는 중...</span>
-          </div>
-        </div>
-      </ManagementLayout>
-    )
+  return {
+    loading,
+    error,
+    allAlarms,
+    filteredAlarms,
+    selectedId,
+    setSelectedId,
+    selectedAlarm,
+    selectedLineId,
+    setLineEquipments,
+    handleMapPinClick,
+    handleLineChange,
   }
-
-  if (error) {
-    return (
-      <ManagementLayout section="situation">
-        <div className="flex flex-col items-center justify-center h-full bg-red-50 m-5 rounded-xl border border-red-200">
-          <p className="text-[14px] text-red-600 m-0">{error}</p>
-        </div>
-      </ManagementLayout>
-    )
-  }
-
-  return (
-    <ManagementLayout section="situation">
-      <div className="flex flex-col gap-3 p-5 h-full">
-        <AlarmSummaryCard alarms={filteredAlarms} />
-
-        <div className="grid grid-cols-[1fr_400px] gap-3 flex-1 min-h-0">
-          <AlarmMapPanel
-            alarms={filteredAlarms}
-            selectedAlarmId={selectedId}
-            onPinClick={handleMapPinClick}
-            selectedLineId={selectedLineId}
-            onLineChange={handleLineChange}
-            onEquipmentsLoaded={setLineEquipments}
-          />
-          <AlarmListPanel
-            alarms={filteredAlarms}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
-        </div>
-      </div>
-    </ManagementLayout>
-  )
 }

@@ -1,5 +1,5 @@
 import type { SeriesStats } from './insights'
-import type { Series } from '.'
+import type { Series } from './types'
 
 interface Props {
   series: Series[]

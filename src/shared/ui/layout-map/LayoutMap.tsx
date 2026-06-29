@@ -394,7 +394,11 @@ function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinVie
           className={[
             'relative block w-4 h-4 rounded-full border-2 border-white shadow-md transition-transform',
             pinColor,
-            dragging ? 'scale-150 ring-4 ring-blue-300' : 'hover:scale-125',
+            dragging
+              ? 'scale-150 ring-4 ring-blue-300'
+              : pin.selected
+                ? 'scale-150 ring-4 ring-blue-400'
+                : 'hover:scale-125',
           ].join(' ')}
         />
       </button>

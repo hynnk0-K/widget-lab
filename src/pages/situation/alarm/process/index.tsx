@@ -1,10 +1,9 @@
 import { AlarmLayout } from '../AlarmLayout'
 import { AlarmListPanel } from '../components/AlarmListPanel'
 import { AlarmMapPanel } from '../components/AlarmMapPanel'
-import { AlarmDetailPanel } from '../components/AlarmDetailPanel'
 import { useAlarmFeed } from '../useAlarmFeed'
 
-export function AlarmRealtimePage() {
+export function AlarmProcessPage() {
   const {
     loading,
     error,
@@ -44,7 +43,8 @@ export function AlarmRealtimePage() {
   return (
     <AlarmLayout>
       <div className="flex flex-col gap-3 p-5 h-full">
-        <div className="grid grid-cols-[1fr_400px] gap-3 flex-1 min-h-0">
+        <div className="grid grid-cols-[400px_1fr] gap-3 flex-1 min-h-0">
+          <AlarmListPanel alarms={filteredAlarms} selectedId={selectedId} onSelect={setSelectedId} />
           <AlarmMapPanel
             alarms={filteredAlarms}
             selectedAlarmId={selectedId}
@@ -54,18 +54,6 @@ export function AlarmRealtimePage() {
             onEquipmentsLoaded={setLineEquipments}
             targetLine={selectedAlarm?.line ?? null}
           />
-          <div className="flex flex-col gap-3 min-h-0">
-            <div className="flex-1 min-h-0">
-              <AlarmListPanel
-                alarms={filteredAlarms}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
-            </div>
-            <div className="h-72 flex-shrink-0">
-              <AlarmDetailPanel alarm={selectedAlarm} />
-            </div>
-          </div>
         </div>
       </div>
     </AlarmLayout>

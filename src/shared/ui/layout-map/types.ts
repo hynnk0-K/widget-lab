@@ -14,6 +14,7 @@ export interface MapPin {
     lastValueLabel?: string
   }
   alarmStatus?: 'critical' | 'warning' | null // ← 추가
+  selected?: boolean
 }
 
 export interface MapImage {
