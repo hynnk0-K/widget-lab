@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
-import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
 import { DiagramMap } from '@/shared/ui/diagram-map'
 import {
-  loadMapMode,
-  saveMapMode,
   loadDiagram,
   saveDiagram,
-  type MapMode,
+  loadBgVisible,
+  saveBgVisible,
+  type DiagramData,
 } from '@/shared/lib/diagramStorage'
+import { readImageFile } from '@/shared/lib/readImageFile'
 
 // ── 백엔드 DTO 타입 ─────────────────────────────────
 interface LineDto {
@@ -61,29 +61,6 @@ interface EquipmentLive {
 
 const LIVE_POLL_MS = 5000
 
-// 설비 타입별 대표 measurement key (실시간 값 표시용)
-const TYPE_TO_METRIC: Record<string, string> = {
-  CNC: 'spindle_load',
-  COMPRESSOR: 'active_power',
-}
-
-const METRIC_LABEL: Record<string, string> = {
-  spindle_load: '부하',
-  active_power: '전력',
-}
-
-// JSONB 문자열 → 좌표 객체
-function parsePosition(raw: string | null): { x: number; y: number } | null {
-  if (!raw) return null
-  try {
-    const p = JSON.parse(raw)
-    if (typeof p?.x === 'number' && typeof p?.y === 'number') return { x: p.x, y: p.y }
-  } catch {
-    /* ignore */
-  }
-  return null
-}
-
 export function LineMapPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -93,14 +70,18 @@ export function LineMapPage() {
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
   const [equipments, setEquipments] = useState<EquipmentDto[]>([])
   const [liveMap, setLiveMap] = useState<Record<string, EquipmentLive>>({})
-  // 디바이스별 최신 측정값 (호버 툴팁용)
-  const [liveValues, setLiveValues] = useState<Record<string, number>>({})
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
-  const [mode, setMode] = useState<MapMode>(() => loadMapMode('line', lineId))
-  const [diagram, setDiagram] = useState(() => loadDiagram('line', lineId))
+  const [diagram, setDiagram] = useState<DiagramData>({ nodes: [], edges: [] })
+  const [showBg, setShowBg] = useState(() => loadBgVisible('line', lineId))
+  const [bgUploading, setBgUploading] = useState(false)
+  const [bgError, setBgError] = useState('')
+  const bgFileInputRef = useRef<HTMLInputElement>(null)
+  const saveDiagramTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const diagramRef = useRef(diagram)
+  diagramRef.current = diagram
 
   // ── 초기 로딩 — 라인 정보 + 도면 + 설비 + 실시간 상태 ──
   useEffect(() => {
@@ -114,8 +95,9 @@ export function LineMapPage() {
       api.get<LayoutImageDto>(`/master/lines/${lineId}/image`).catch(() => null),
       api.get<EquipmentDto[]>(`/master/equipments?lineId=${lineId}`),
       api.get<EquipmentLive[]>(`/equipment-live?lineId=${lineId}`),
+      loadDiagram('line', lineId),
     ])
-      .then(([lineData, imgData, equipsData, liveData]) => {
+      .then(([lineData, imgData, equipsData, liveData, diagramData]) => {
         if (!active) return
         setLine(lineData)
         if (imgData?.imageBase64 && imgData.width && imgData.height) {
@@ -129,6 +111,7 @@ export function LineMapPage() {
         }
         setEquipments(equipsData)
         setLiveMap(Object.fromEntries(liveData.map((l) => [l.code, l])))
+        setDiagram(diagramData)
       })
       .catch((err) => {
         if (!active) return
@@ -140,6 +123,16 @@ export function LineMapPage() {
 
     return () => {
       active = false
+    }
+  }, [lineId])
+
+  // 페이지를 떠날 때 디바운스 대기 중인 저장이 있으면 즉시 flush
+  useEffect(() => {
+    return () => {
+      if (saveDiagramTimerRef.current) {
+        clearTimeout(saveDiagramTimerRef.current)
+        saveDiagram('line', lineId, diagramRef.current)
+      }
     }
   }, [lineId])
 
@@ -157,64 +150,6 @@ export function LineMapPage() {
     return () => clearInterval(timer)
   }, [lineId])
 
-  // ── 각 설비의 대표 측정값 polling ──
-  useEffect(() => {
-    if (equipments.length === 0) return
-    let active = true
-
-    async function loadValues() {
-      const next: Record<string, number> = {}
-      await Promise.all(
-        equipments.map(async (eq) => {
-          const metric = TYPE_TO_METRIC[eq.equipmentType ?? '']
-          if (!metric) return
-          const path = eq.equipmentType === 'CNC' ? 'cnc' : 'compressors'
-          try {
-            const data = await api.get<Record<string, unknown>>(
-              `/${path}/latest?deviceId=${encodeURIComponent(eq.code)}`,
-            )
-            const camel = metric.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
-            const v = data[camel]
-            if (typeof v === 'number') next[eq.code] = v
-          } catch {
-            /* ignore */
-          }
-        }),
-      )
-      if (active) setLiveValues(next)
-    }
-
-    loadValues()
-    const timer = setInterval(loadValues, LIVE_POLL_MS)
-    return () => {
-      active = false
-      clearInterval(timer)
-    }
-  }, [equipments])
-
-  // ── 설비 + 실시간 상태 → MapPin 변환 ──
-  const pins: MapPin[] = useMemo(() => {
-    return equipments.map((eq) => {
-      const live = liveMap[eq.code]
-      const metric = TYPE_TO_METRIC[eq.equipmentType ?? '']
-      const value = liveValues[eq.code]
-      let lastValueLabel: string | undefined
-      if (metric && value !== undefined) {
-        lastValueLabel = `${METRIC_LABEL[metric] ?? metric}: ${value.toFixed(1)}`
-      }
-      return {
-        id: eq.id,
-        code: eq.code,
-        name: eq.name,
-        position: parsePosition(eq.position),
-        live: {
-          hasData: live?.hasData ?? false,
-          lastValueLabel,
-        },
-      }
-    })
-  }, [equipments, liveMap, liveValues])
-
   // ── 핸들러 ──
   async function handleImageUpload(base64: string, width: number, height: number) {
     await api.put<LayoutImageDto>(`/master/lines/${lineId}/image`, {
@@ -230,22 +165,35 @@ export function LineMapPage() {
     setImage(null)
   }
 
-  async function handlePinMove(pinId: number | string, position: { x: number; y: number }) {
-    const positionJson = JSON.stringify(position)
-    await api.patch<EquipmentDto>(`/master/equipments/${pinId}/position`, {
-      position: positionJson,
-    })
-    setEquipments((prev) =>
-      prev.map((e) => (e.id === pinId ? { ...e, position: positionJson } : e)),
-    )
+  async function handleBgFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBgError('')
+    setBgUploading(true)
+    try {
+      const { base64, width, height } = await readImageFile(file)
+      await handleImageUpload(base64, width, height)
+    } catch (err) {
+      setBgError(err instanceof Error ? err.message : '업로드 실패')
+    } finally {
+      setBgUploading(false)
+      if (bgFileInputRef.current) bgFileInputRef.current.value = ''
+    }
   }
 
-  function handlePinClick(pinId: number | string) {
-    const eq = equipments.find((e) => e.id === pinId)
-    if (eq) {
-      console.log('선택된 설비:', eq)
-      // 추후: 설비 상세 사이드 패널 열기
-    }
+  // 드래그/리사이즈 중 매번 PUT 보내지 않도록 디바운스
+  function handleDiagramChange(next: DiagramData) {
+    setDiagram(next)
+    if (saveDiagramTimerRef.current) clearTimeout(saveDiagramTimerRef.current)
+    saveDiagramTimerRef.current = setTimeout(() => {
+      saveDiagram('line', lineId, next)
+    }, 600)
+  }
+
+  function toggleShowBg() {
+    const next = !showBg
+    setShowBg(next)
+    saveBgVisible('line', lineId, next)
   }
 
   // ── 렌더 ──
@@ -297,30 +245,46 @@ export function LineMapPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex border border-slate-200 rounded-lg overflow-hidden text-[12px]">
+          {image && (
             <button
-              onClick={() => {
-                setMode('image')
-                saveMapMode('line', lineId, 'image')
-              }}
-              className={`h-8 px-3 transition-colors ${
-                mode === 'image' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              onClick={toggleShowBg}
+              className={`h-8 px-3 text-[12px] rounded-lg border transition-colors ${
+                showBg
+                  ? 'bg-[#003087] text-white border-[#003087]'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
             >
-              이미지
+              배경 이미지 {showBg ? '켜짐' : '꺼짐'}
             </button>
-            <button
-              onClick={() => {
-                setMode('diagram')
-                saveMapMode('line', lineId, 'diagram')
-              }}
-              className={`h-8 px-3 transition-colors border-l border-slate-200 ${
-                mode === 'diagram' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              다이어그램
-            </button>
-          </div>
+          )}
+          {editMode && (
+            <>
+              <input
+                ref={bgFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleBgFileChange}
+                disabled={bgUploading}
+                className="hidden"
+                id="bg-file-input"
+              />
+              <label
+                htmlFor="bg-file-input"
+                className="h-8 px-3 text-[12px] bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer flex items-center"
+              >
+                {bgUploading ? '업로드 중...' : image ? '배경 변경' : '배경 업로드'}
+              </label>
+              {image && (
+                <button
+                  onClick={handleImageDelete}
+                  className="h-8 px-3 text-[12px] text-red-500 border border-slate-200 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  배경 삭제
+                </button>
+              )}
+            </>
+          )}
+          {bgError && <span className="text-[11px] text-red-500">{bgError}</span>}
           {editMode ? (
             <button
               onClick={() => setEditMode(false)}
@@ -352,30 +316,15 @@ export function LineMapPage() {
         </div>
       </div>
 
-      {/* 도면 + 핀 */}
-      {mode === 'image' ? (
-        <LayoutMap
-          image={image}
-          pins={pins}
-          editMode={editMode}
-          onImageUpload={handleImageUpload}
-          onImageDelete={handleImageDelete}
-          onPinMove={handlePinMove}
-          onPinClick={handlePinClick}
-        />
-      ) : (
-        <DiagramMap
-          nodes={diagram.nodes}
-          edges={diagram.edges}
-          editMode={editMode}
-          equipmentOptions={equipments.map((eq) => ({ code: eq.code, name: eq.name }))}
-          onChange={(nodes, edges) => {
-            const next = { nodes, edges }
-            setDiagram(next)
-            saveDiagram('line', lineId, next)
-          }}
-        />
-      )}
+      {/* 도면 — 배경 이미지(선택) + 다이어그램 */}
+      <DiagramMap
+        nodes={diagram.nodes}
+        edges={diagram.edges}
+        editMode={editMode}
+        equipmentOptions={equipments.map((eq) => ({ code: eq.code, name: eq.name }))}
+        backgroundImage={showBg ? image : null}
+        onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
+      />
     </div>
   )
 }

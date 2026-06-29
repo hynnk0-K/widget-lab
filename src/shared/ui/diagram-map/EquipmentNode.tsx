@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react'
 import {
   Box,
   Fan,
@@ -46,8 +46,9 @@ export function EquipmentNode({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`relative flex flex-col items-center gap-1 px-2 py-1.5 rounded-lg border bg-white ${borderClass}`}
+      className={`relative w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-1.5 rounded-lg border bg-white ${borderClass}`}
     >
+      <NodeResizer isVisible={selected} minWidth={56} minHeight={48} />
       {alarmStatus && (
         <span
           className={`absolute -inset-1 rounded-lg animate-ping opacity-40 ${
@@ -57,7 +58,7 @@ export function EquipmentNode({ data, selected }: NodeProps) {
       )}
       <Handle type="target" position={Position.Left} className="!bg-slate-400" />
       <Icon
-        className={`relative w-6 h-6 ${
+        className={`relative w-6 h-6 flex-shrink-0 ${
           alarmStatus === 'critical'
             ? 'text-red-600'
             : alarmStatus === 'warning'
@@ -65,7 +66,7 @@ export function EquipmentNode({ data, selected }: NodeProps) {
               : 'text-slate-700'
         }`}
       />
-      <span className="relative text-[11px] text-slate-700 whitespace-nowrap">
+      <span className="relative w-full text-[11px] text-slate-700 text-center truncate">
         {String(data.label ?? '')}
       </span>
       <Handle type="source" position={Position.Right} className="!bg-slate-400" />

@@ -1,30 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { readImageFile } from '@/shared/lib/readImageFile'
 import type { LayoutMapProps, MapPin } from './types'
-
-// 파일 → Base64 + 크기 측정
-async function readImageFile(
-  file: File,
-): Promise<{ base64: string; width: number; height: number }> {
-  // 1) 파일을 Base64로 읽기
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error('파일 읽기 실패'))
-    reader.readAsDataURL(file)
-  })
-
-  // 2) Image 객체로 크기 측정
-  const { width, height } = await new Promise<{ width: number; height: number }>(
-    (resolve, reject) => {
-      const img = new Image()
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
-      img.onerror = () => reject(new Error('이미지 디코딩 실패'))
-      img.src = base64
-    },
-  )
-
-  return { base64, width, height }
-}
 
 export function LayoutMap({
   image,

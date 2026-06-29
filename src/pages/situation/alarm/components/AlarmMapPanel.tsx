@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/shared/lib/api'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
 import { DiagramMap } from '@/shared/ui/diagram-map'
-import { loadMapMode, loadDiagram } from '@/shared/lib/diagramStorage'
+import { loadDiagram, loadBgVisible, type DiagramData } from '@/shared/lib/diagramStorage'
 import type { Alarm, EquipmentDto } from '../types'
 
 interface LineDto {
@@ -53,6 +53,7 @@ export function AlarmMapPanel({
   //   const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
   const [equipments, setEquipments] = useState<EquipmentDto[]>([])
+  const [diagram, setDiagram] = useState<DiagramData>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(true)
 
   // 라인 목록 로드
@@ -86,8 +87,9 @@ export function AlarmMapPanel({
     Promise.all([
       api.get<LayoutImageDto>(`/master/lines/${selectedLineId}/image`).catch(() => null),
       api.get<EquipmentDto[]>(`/master/equipments?lineId=${selectedLineId}`),
+      loadDiagram('line', selectedLineId),
     ])
-      .then(([imgData, equipsData]) => {
+      .then(([imgData, equipsData, diagramData]) => {
         if (imgData?.imageBase64 && imgData.width && imgData.height) {
           setImage({ base64: imgData.imageBase64, width: imgData.width, height: imgData.height })
         } else {
@@ -95,6 +97,7 @@ export function AlarmMapPanel({
         }
         setEquipments(equipsData)
         onEquipmentsLoaded(equipsData) // ← 부모에 알림
+        setDiagram(diagramData)
       })
       .finally(() => setLoading(false))
   }, [selectedLineId, onEquipmentsLoaded])
@@ -135,13 +138,10 @@ export function AlarmMapPanel({
     }))
   }, [equipments, alarmStatusByDevice, selectedDeviceCode])
 
-  // 해당 라인이 다이어그램(P&ID) 모드로 그려져 있으면 그걸로 표시
-  const mapMode = useMemo(
-    () => (selectedLineId ? loadMapMode('line', selectedLineId) : 'image'),
-    [selectedLineId],
-  )
-  const diagram = useMemo(
-    () => (selectedLineId ? loadDiagram('line', selectedLineId) : { nodes: [], edges: [] }),
+  // 해당 라인에 다이어그램(P&ID)이 만들어져 있으면 그걸로 표시, 아직 없으면 기존 이미지+핀으로 폴백
+  const hasDiagram = diagram.nodes.length > 0
+  const showBg = useMemo(
+    () => (selectedLineId ? loadBgVisible('line', selectedLineId) : true),
     [selectedLineId],
   )
 
@@ -199,13 +199,14 @@ export function AlarmMapPanel({
           <div className="flex items-center justify-center h-full text-sm text-slate-400">
             도면 불러오는 중...
           </div>
-        ) : mapMode === 'diagram' ? (
+        ) : hasDiagram ? (
           <DiagramMap
             nodes={diagram.nodes}
             edges={diagram.edges}
             editMode={false}
             alarmStatusByDevice={alarmStatusByDevice}
             selectedDeviceCode={selectedDeviceCode}
+            backgroundImage={showBg ? image : null}
           />
         ) : (
           <LayoutMap image={image} pins={pins} editMode={false} onPinClick={handlePinClick} />

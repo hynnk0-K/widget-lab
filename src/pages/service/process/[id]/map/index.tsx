@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
@@ -9,6 +9,7 @@ import {
   loadDiagram,
   saveDiagram,
   type MapMode,
+  type DiagramData,
 } from '@/shared/lib/diagramStorage'
 
 interface ProcessDto {
@@ -69,7 +70,10 @@ export function ProcessMapPage() {
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
   const [mode, setMode] = useState<MapMode>(() => loadMapMode('process', processId))
-  const [diagram, setDiagram] = useState(() => loadDiagram('process', processId))
+  const [diagram, setDiagram] = useState<DiagramData>({ nodes: [], edges: [] })
+  const saveDiagramTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const diagramRef = useRef(diagram)
+  diagramRef.current = diagram
 
   useEffect(() => {
     if (!processId || Number.isNaN(processId)) return
@@ -81,8 +85,9 @@ export function ProcessMapPage() {
       api.get<ProcessDto>(`/master/processes/${processId}`),
       api.get<LayoutImageDto>(`/master/processes/${processId}/image`).catch(() => null),
       api.get<LineDto[]>(`/master/lines?processId=${processId}`),
+      loadDiagram('process', processId),
     ])
-      .then(([processData, imgData, linesData]) => {
+      .then(([processData, imgData, linesData, diagramData]) => {
         if (!active) return
         setProcess(processData)
         if (imgData?.imageBase64 && imgData.width && imgData.height) {
@@ -95,6 +100,7 @@ export function ProcessMapPage() {
           setImage(null)
         }
         setLines(linesData)
+        setDiagram(diagramData)
       })
       .catch((err) => {
         if (!active) return
@@ -109,6 +115,16 @@ export function ProcessMapPage() {
     }
   }, [processId])
 
+  // 페이지를 떠날 때 디바운스 대기 중인 저장이 있으면 즉시 flush
+  useEffect(() => {
+    return () => {
+      if (saveDiagramTimerRef.current) {
+        clearTimeout(saveDiagramTimerRef.current)
+        saveDiagram('process', processId, diagramRef.current)
+      }
+    }
+  }, [processId])
+
   const pins: MapPin[] = useMemo(() => {
     return lines.map((l) => ({
       id: l.id,
@@ -118,6 +134,15 @@ export function ProcessMapPage() {
       live: { hasData: false },
     }))
   }, [lines])
+
+  // 드래그/리사이즈 중 매번 PUT 보내지 않도록 디바운스
+  function handleDiagramChange(next: DiagramData) {
+    setDiagram(next)
+    if (saveDiagramTimerRef.current) clearTimeout(saveDiagramTimerRef.current)
+    saveDiagramTimerRef.current = setTimeout(() => {
+      saveDiagram('process', processId, next)
+    }, 600)
+  }
 
   async function handleImageUpload(base64: string, width: number, height: number) {
     await api.put<LayoutImageDto>(`/master/processes/${processId}/image`, {
@@ -267,11 +292,7 @@ export function ProcessMapPage() {
           nodes={diagram.nodes}
           edges={diagram.edges}
           editMode={editMode}
-          onChange={(nodes, edges) => {
-            const next = { nodes, edges }
-            setDiagram(next)
-            saveDiagram('process', processId, next)
-          }}
+          onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
         />
       )}
     </div>

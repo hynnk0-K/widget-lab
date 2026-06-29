@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
+import { api } from '@/shared/lib/api'
 
 export interface DiagramData {
   nodes: Node[]
@@ -7,9 +8,10 @@ export interface DiagramData {
 
 export type MapMode = 'image' | 'diagram'
 
-// ponytail: 백엔드에 diagram/mode 저장 API가 아직 없어서 localStorage로 우선 처리.
-// 서버 동기화가 필요해지면 /master/processes/:id/diagram, /master/lines/:id/diagram 같은
-// 엔드포인트를 추가하고 이 두 함수만 api.get/put으로 교체하면 됨.
+const SCOPE_PATH: Record<'process' | 'line', string> = {
+  process: '/master/processes',
+  line: '/master/lines',
+}
 
 export function loadMapMode(scope: 'process' | 'line', id: number): MapMode {
   const v = localStorage.getItem(`map-mode:${scope}:${id}`)
@@ -20,17 +22,24 @@ export function saveMapMode(scope: 'process' | 'line', id: number, mode: MapMode
   localStorage.setItem(`map-mode:${scope}:${id}`, mode)
 }
 
-export function loadDiagram(scope: 'process' | 'line', id: number): DiagramData {
-  const raw = localStorage.getItem(`diagram:${scope}:${id}`)
-  if (!raw) return { nodes: [], edges: [] }
+// 다이어그램 위에 업로드 이미지를 배경으로 깔지 여부 (이미지/다이어그램 양자택일이 아니라 둘을 같이 쓰는 경우용)
+export function loadBgVisible(scope: 'process' | 'line', id: number): boolean {
+  return localStorage.getItem(`map-bg:${scope}:${id}`) !== 'off'
+}
+
+export function saveBgVisible(scope: 'process' | 'line', id: number, visible: boolean) {
+  localStorage.setItem(`map-bg:${scope}:${id}`, visible ? 'on' : 'off')
+}
+
+export async function loadDiagram(scope: 'process' | 'line', id: number): Promise<DiagramData> {
   try {
-    const parsed = JSON.parse(raw)
-    return { nodes: parsed.nodes ?? [], edges: parsed.edges ?? [] }
+    const data = await api.get<Partial<DiagramData>>(`${SCOPE_PATH[scope]}/${id}/diagram`)
+    return { nodes: data.nodes ?? [], edges: data.edges ?? [] }
   } catch {
-    return { nodes: [], edges: [] }
+    return { nodes: [], edges: [] } // 저장된 도면 없음 (404)
   }
 }
 
-export function saveDiagram(scope: 'process' | 'line', id: number, data: DiagramData) {
-  localStorage.setItem(`diagram:${scope}:${id}`, JSON.stringify(data))
+export async function saveDiagram(scope: 'process' | 'line', id: number, data: DiagramData) {
+  await api.put(`${SCOPE_PATH[scope]}/${id}/diagram`, data)
 }

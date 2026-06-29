@@ -33,9 +33,13 @@ interface Props {
   alarmStatusByDevice?: Record<string, 'critical' | 'warning'>
   /** 현재 선택된 알람의 deviceCode — 일치하는 노드를 강조 표시 */
   selectedDeviceCode?: string | null
+  /** 업로드된 평면도 이미지를 다이어그램 배경으로 깔기 (없으면 표시 안 함) */
+  backgroundImage?: { base64: string; width: number; height: number } | null
 }
 
 const NODE_TYPES = { equipment: EquipmentNode, group: GroupNode }
+
+const EQUIPMENT_DEFAULT_SIZE = { width: 92, height: 64 }
 
 let nextId = 1
 
@@ -54,6 +58,7 @@ function DiagramMapInner({
   equipmentOptions,
   alarmStatusByDevice,
   selectedDeviceCode,
+  backgroundImage,
 }: Props) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(nodes)
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(edges)
@@ -66,19 +71,21 @@ function DiagramMapInner({
     onChangeRef.current?.(rfNodes, rfEdges)
   }, [rfNodes, rfEdges])
 
-  // 알람 상태/선택 표시를 노드 data에 주입 (장비 노드만)
+  // 장비 노드 크기 기본값 + 알람 상태/선택 표시 주입
   const nodesWithAlarm = useMemo(() => {
-    if (!alarmStatusByDevice && !selectedDeviceCode) return rfNodes
     return rfNodes.map((n) => {
       if (n.type !== 'equipment') return n
       const deviceCode = n.data.deviceCode as string | undefined
-      if (!deviceCode) return n
+      const needsDefaultSize = !n.style?.width || !n.style?.height
       return {
         ...n,
+        style: needsDefaultSize
+          ? { ...n.style, width: n.style?.width ?? EQUIPMENT_DEFAULT_SIZE.width, height: n.style?.height ?? EQUIPMENT_DEFAULT_SIZE.height }
+          : n.style,
         data: {
           ...n.data,
-          alarmStatus: alarmStatusByDevice?.[deviceCode] ?? null,
-          selected: deviceCode === selectedDeviceCode,
+          alarmStatus: (deviceCode && alarmStatusByDevice?.[deviceCode]) ?? null,
+          selected: Boolean(deviceCode && deviceCode === selectedDeviceCode),
         },
       }
     })
@@ -173,11 +180,26 @@ function DiagramMapInner({
     setEditing(null)
   }
 
+  function handleDeleteNode() {
+    if (!editing || editing.nodeId === null) return
+    const nodeId = editing.nodeId
+    setRfNodes((curr) => curr.filter((n) => n.id !== nodeId))
+    setRfEdges((curr) => curr.filter((e) => e.source !== nodeId && e.target !== nodeId))
+    setEditing(null)
+  }
+
   return (
     <div
       className="relative w-full bg-white rounded-xl border border-slate-200 overflow-hidden"
       style={{ height: 520 }}
     >
+      {backgroundImage && (
+        <img
+          src={backgroundImage.base64}
+          alt="배경 도면"
+          className="absolute inset-0 w-full h-full object-contain opacity-60 pointer-events-none"
+        />
+      )}
       {editMode && (
         <div className="absolute top-3 left-3 z-10 flex gap-2">
           <button
@@ -211,7 +233,7 @@ function DiagramMapInner({
         deleteKeyCode={editMode ? ['Backspace', 'Delete'] : null}
         fitView
       >
-        <Background />
+        {!backgroundImage && <Background />}
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable />
       </ReactFlow>
@@ -261,6 +283,15 @@ function DiagramMapInner({
               </select>
             )}
             <div className="flex justify-end gap-2">
+              {editing.nodeId !== null && (
+                <button
+                  type="button"
+                  onClick={handleDeleteNode}
+                  className="h-8 px-3 text-[12px] text-red-500 hover:bg-red-50 rounded-lg mr-auto"
+                >
+                  삭제
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setEditing(null)}
