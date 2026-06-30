@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/shared/lib/api'
 import { useAuthStore } from '@/shared/store/auth'
+import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { WidgetGrid } from '@/shared/ui/widgets/WidgetGrid'
 import { AddWidgetModal } from '@/shared/ui/widgets/AddWidgetModal'
 import type { DashboardLayout, Widget } from '@/shared/ui/widgets/types'
@@ -90,27 +91,23 @@ export function HomePage() {
 
   if (layout === null) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-[#003087] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[13px] text-slate-400">대시보드 불러오는 중...</span>
+      <ManagementLayout section="realtime">
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-6 h-6 border-2 border-[#003087] border-t-transparent rounded-full animate-spin" />
+            <span className="text-[13px] text-slate-400">대시보드 불러오는 중...</span>
+          </div>
         </div>
-      </div>
+      </ManagementLayout>
     )
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <ManagementLayout section="realtime">
+      <div className="flex flex-col gap-3 p-5 h-full">
       {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="m-0 text-[20px] font-bold text-slate-900 leading-tight">
-            실시간 모니터링
-          </h1>
-          {layout && (
-            <p className="m-0 text-[12px] text-slate-400 mt-0.5">위젯 {layout.widgets.length}개</p>
-          )}
-        </div>
+        <p className="m-0 text-[12px] text-slate-400">위젯 {layout.widgets.length}개</p>
 
         <div className="flex items-center gap-2">
           {editMode ? (
@@ -196,6 +193,7 @@ export function HomePage() {
       )}
 
       {showModal && <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />}
-    </div>
+      </div>
+    </ManagementLayout>
   )
 }

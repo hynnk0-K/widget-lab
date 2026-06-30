@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
-import { SubTabs } from '@/shared/ui/SubTabs'
+import { SideTabs } from '@/shared/ui/SideTabs'
 
 const ALARM_SUBTABS = [
   { label: '실시간 모니터링', href: '/situation/alarm/realtime' },
@@ -13,9 +13,9 @@ const ALARM_SUBTABS = [
 export function AlarmLayout({ children }: { children: ReactNode }) {
   return (
     <ManagementLayout section="situation">
-      <div className="flex flex-col h-full">
-        <SubTabs tabs={ALARM_SUBTABS} />
-        <div className="flex-1 overflow-auto">{children}</div>
+      <div className="flex h-full">
+        <SideTabs tabs={ALARM_SUBTABS} />
+        <div className="flex-1 overflow-auto min-w-0">{children}</div>
       </div>
     </ManagementLayout>
   )

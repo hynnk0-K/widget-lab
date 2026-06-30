@@ -114,7 +114,7 @@ function toOptions(nodes: MasterTreeNode[]): SelectOption[] {
 const INITIAL_FAVORITES = ['울산5공장', '아산공장', '광주공장']
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const [tree, setTree] = useState<MasterTreeNode[]>([])
 
   const [companyId, setCompanyId] = useState('')

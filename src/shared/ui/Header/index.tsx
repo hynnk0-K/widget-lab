@@ -5,7 +5,7 @@ import { api } from '@/shared/lib/api'
 import { useAuthStore } from '@/shared/store/auth'
 
 const NAV_ITEMS = [
-  { label: '실시간 모니터링', href: '/', exact: true },
+  { label: '실시간 모니터링', href: '/realtime/dashboard', exact: false },
   { label: '상황대응', href: '/situation/alarm', exact: false },
   { label: '현황/통계', href: '/statistics', exact: false },
   { label: '서비스정보관리', href: '/service/factory', exact: false },

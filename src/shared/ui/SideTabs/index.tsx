@@ -10,12 +10,12 @@ interface Props {
   tabs: Tab[]
 }
 
-export function SubTabs({ tabs }: Props) {
+export function SideTabs({ tabs }: Props) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
 
   return (
-    <div className="flex items-center gap-1 px-6 pt-4 border-b border-slate-100 flex-shrink-0">
+    <div className="w-[200px] flex-shrink-0 border-r border-slate-100 py-2 overflow-y-auto">
       {tabs.map((tab) => {
         const isActive = pathname === tab.href || pathname.startsWith(`${tab.href}/`)
         return (
@@ -23,10 +23,10 @@ export function SubTabs({ tabs }: Props) {
             key={tab.href}
             onClick={() => navigate(tab.href)}
             className={cn(
-              'px-3 py-2 text-[12.5px] font-medium rounded-t transition-colors whitespace-nowrap',
+              'w-full text-left px-4 py-2.5 text-[12.5px] font-medium transition-colors border-l-2',
               isActive
-                ? 'bg-white text-[#003087] border border-slate-200 border-b-white -mb-px'
-                : 'text-slate-500 hover:text-slate-700',
+                ? 'bg-blue-50 text-[#003087] border-[#003087]'
+                : 'text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-700',
             )}
           >
             {tab.label}

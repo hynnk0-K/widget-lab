@@ -8,9 +8,24 @@ interface Tab {
 }
 
 const SECTION_CONFIG: Record<
-  'situation' | 'service' | 'system' | 'statistics',
+  'situation' | 'service' | 'system' | 'statistics' | 'realtime',
   { label: string; tabs: Tab[] }
 > = {
+  realtime: {
+    label: '실시간 모니터링',
+    tabs: [
+      { label: '대시보드', href: '/realtime/dashboard' },
+      { label: '체감온도', href: '/realtime/wbgt' },
+      { label: '밀폐공간 유해가스', href: '/realtime/gas' },
+      { label: '이동형 모션센서', href: '/realtime/motion' },
+      { label: '도시가스 정압실', href: '/realtime/citygas' },
+      { label: '환경설비', href: '/realtime/environment' },
+      { label: '안전장치', href: '/realtime/safety' },
+      { label: '소방설비', href: '/realtime/firefighting' },
+      { label: '장비 통신상태', href: '/realtime/comm-status' },
+      { label: '외부 솔루션 연계', href: '/realtime/external' },
+    ],
+  },
   situation: {
     label: '상황대응',
     tabs: [
@@ -50,6 +65,16 @@ const SECTION_CONFIG: Record<
 }
 
 const IMPLEMENTED = new Set([
+  '/realtime/dashboard',
+  '/realtime/wbgt',
+  '/realtime/gas',
+  '/realtime/motion',
+  '/realtime/citygas',
+  '/realtime/environment',
+  '/realtime/safety',
+  '/realtime/firefighting',
+  '/realtime/comm-status',
+  '/realtime/external',
   '/situation/alarm',
   '/situation/incident',
   '/statistics/alarm-stats',
@@ -66,7 +91,7 @@ const IMPLEMENTED = new Set([
 ])
 
 interface Props {
-  section: 'situation' | 'service' | 'system' | 'statistics'
+  section: 'situation' | 'service' | 'system' | 'statistics' | 'realtime'
   children: ReactNode
 }
 
@@ -96,7 +121,6 @@ export function ManagementLayout({ section, children }: Props) {
           </svg>
           <span className="text-slate-600 font-medium">{activeTab?.label ?? ''}</span>
         </div>
-
         {/* 페이지 타이틀 */}
         <div className="flex justify-between flex-shrink-0 mb-2">
           <div className="px-6">
@@ -107,7 +131,7 @@ export function ManagementLayout({ section, children }: Props) {
             </h1>
           </div>
           {/* 탭 네비게이션 */}
-          <div className="flex items-end gap-0 px-6 flex-shrink-0">
+          <div className="flex items-end gap-0 px-6 flex-shrink-0 flex-wrap justify-end max-w-[90%]">
             {config.tabs.map((tab) => {
               const isActive = tab === activeTab
               const isAvailable = IMPLEMENTED.has(tab.href)
