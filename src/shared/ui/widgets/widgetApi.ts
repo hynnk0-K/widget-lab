@@ -28,14 +28,16 @@ function pickValue(data: Record<string, unknown>, metric: string): number | null
 }
 
 // gauge용: 최신값 1건
-export async function fetchLatest(
-  deviceId: string,
-  metric: string,
-): Promise<number | null> {
+// ponytail: TSDB 라이센스 만료로 기존 /{path}/latest가 500을 냄. 임시로 TimescaleDB(/ts/{path}/latest)만 조회.
+// TSDB 라이센스 복구되면 아래 주석을 풀어 원래 호출로 되돌릴 것.
+export async function fetchLatest(deviceId: string, metric: string): Promise<number | null> {
+  const path = devicePath(deviceId)
+  // const data = await api.get<Record<string, unknown>>(
+  //   `/${path}/latest?deviceId=${encodeURIComponent(deviceId)}`,
+  // )
   try {
-    const path = devicePath(deviceId)
     const data = await api.get<Record<string, unknown>>(
-      `/${path}/latest?deviceId=${encodeURIComponent(deviceId)}`,
+      `/ts/${path}/latest?deviceId=${encodeURIComponent(deviceId)}`,
     )
     return pickValue(data, metric)
   } catch {
@@ -44,17 +46,22 @@ export async function fetchLatest(
 }
 
 // trend용: 집계 포인트 배열
+// ponytail: TSDB 라이센스 만료로 기존 /{path}/trend가 500을 냄. 임시로 TimescaleDB(/ts/{path}/trend)만 조회.
+// TSDB 라이센스 복구되면 아래 주석을 풀어 원래 호출로 되돌릴 것.
 export async function fetchTrend(
   deviceId: string,
   metric: string,
   hours: number,
   intervalMinutes: number,
 ): Promise<TrendPoint[]> {
+  const path = devicePath(deviceId)
+  const metricParam = path !== 'sensors' ? `&metric=${encodeURIComponent(metric)}` : ''
+  // const data = await api.get<TrendPoint[]>(
+  //   `/${path}/trend?deviceId=${encodeURIComponent(deviceId)}&hours=${hours}&intervalMinutes=${intervalMinutes}${metricParam}`,
+  // )
   try {
-    const path = devicePath(deviceId)
-    const metricParam = path !== 'sensors' ? `&metric=${encodeURIComponent(metric)}` : ''
     return await api.get<TrendPoint[]>(
-      `/${path}/trend?deviceId=${encodeURIComponent(deviceId)}&hours=${hours}&intervalMinutes=${intervalMinutes}${metricParam}`,
+      `/ts/${path}/trend?deviceId=${encodeURIComponent(deviceId)}&hours=${hours}&intervalMinutes=${intervalMinutes}${metricParam}`,
     )
   } catch {
     return []

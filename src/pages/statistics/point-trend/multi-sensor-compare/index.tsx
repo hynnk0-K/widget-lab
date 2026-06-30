@@ -170,7 +170,10 @@ export function MultiSensorComparePage() {
     Promise.all(
       series.map(async (s) => {
         const path = devicePath(s.deviceCode)
-        const url = `/${path}/trend?deviceId=${encodeURIComponent(s.deviceCode)}&metric=${encodeURIComponent(s.metric)}&hours=${range.hours}&intervalMinutes=${range.intervalMinutes}`
+        // ponytail: TSDB 라이센스 만료로 기존 /{path}/trend가 500을 냄. 임시로 TimescaleDB(/ts/{path}/trend)만 조회.
+        // TSDB 라이센스 복구되면 아래 주석을 풀어 원래 호출로 되돌릴 것.
+        // const url = `/${path}/trend?deviceId=${encodeURIComponent(s.deviceCode)}&metric=${encodeURIComponent(s.metric)}&hours=${range.hours}&intervalMinutes=${range.intervalMinutes}`
+        const url = `/ts/${path}/trend?deviceId=${encodeURIComponent(s.deviceCode)}&metric=${encodeURIComponent(s.metric)}&hours=${range.hours}&intervalMinutes=${range.intervalMinutes}`
         const points = await api.get<TrendPoint[]>(url)
         return { seriesId: s.id, points, bytes: JSON.stringify(points).length }
       }),
