@@ -28,10 +28,7 @@ const SECTION_CONFIG: Record<
   },
   situation: {
     label: '상황대응',
-    tabs: [
-      { label: '알람/이벤트', href: '/situation/alarm' },
-      { label: '사고/인시던트', href: '/situation/incident' },
-    ],
+    tabs: [{ label: '알람/이벤트', href: '/situation/alarm' }],
   },
   statistics: {
     label: '현황/통계',
@@ -76,7 +73,6 @@ const IMPLEMENTED = new Set([
   '/realtime/comm-status',
   '/realtime/external',
   '/situation/alarm',
-  '/situation/incident',
   '/statistics/alarm-stats',
   '/statistics/incident-stats',
   '/statistics/device-history',

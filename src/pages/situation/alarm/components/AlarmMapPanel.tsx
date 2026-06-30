@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '@/shared/lib/api'
+import { parsePosition } from '@/shared/lib/parsePosition'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
 import { DiagramMap } from '@/shared/ui/diagram-map'
 import { loadDiagram, loadBgVisible, type DiagramData } from '@/shared/lib/diagramStorage'
@@ -27,17 +28,6 @@ interface Props {
   onEquipmentsLoaded: (equipments: EquipmentDto[]) => void
   /** 선택된 알람이 속한 라인 — 일치하는 라인으로 자동 전환 */
   targetLine?: string | null
-}
-
-function parsePosition(raw: string | null): { x: number; y: number } | null {
-  if (!raw) return null
-  try {
-    const p = JSON.parse(raw)
-    if (typeof p?.x === 'number' && typeof p?.y === 'number') return { x: p.x, y: p.y }
-  } catch {
-    /* ignore */
-  }
-  return null
 }
 
 export function AlarmMapPanel({

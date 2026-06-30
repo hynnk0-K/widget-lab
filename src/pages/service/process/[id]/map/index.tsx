@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
+import { parsePosition } from '@/shared/lib/parsePosition'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
 import { DiagramMap } from '@/shared/ui/diagram-map'
 import {
@@ -47,26 +48,6 @@ interface LineDto {
   updatedAt: string
 }
 
-// position 컬럼은 JSON 문자열 {x, y, w?, h?} — w/h는 카드 사이즈(없으면 기본값)
-function parsePosition(
-  raw: string | null,
-): { x: number; y: number; width?: number; height?: number } | null {
-  if (!raw) return null
-  try {
-    const p = JSON.parse(raw)
-    if (typeof p?.x === 'number' && typeof p?.y === 'number') {
-      return {
-        x: p.x,
-        y: p.y,
-        width: typeof p?.w === 'number' ? p.w : undefined,
-        height: typeof p?.h === 'number' ? p.h : undefined,
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return null
-}
 
 export function ProcessMapPage() {
   const { id } = useParams<{ id: string }>()

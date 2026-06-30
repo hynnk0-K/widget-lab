@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { api } from '@/shared/lib/api'
+import { parsePosition } from '@/shared/lib/parsePosition'
 import { WbgtZoneMap, type WbgtZonePin, type WbgtZoneSummary } from './WbgtZoneMap'
 import {
   WBGT_RISK_COLOR,
@@ -44,17 +45,6 @@ function descendants(nodes: MasterTreeNode[], targetType: string): MasterTreeNod
     else if (node.children?.length) result.push(...descendants(node.children, targetType))
   }
   return result
-}
-
-function parsePosition(raw: string | null | undefined): { x: number; y: number } | null {
-  if (!raw) return null
-  try {
-    const p = JSON.parse(raw)
-    if (typeof p?.x === 'number' && typeof p?.y === 'number') return { x: p.x, y: p.y }
-  } catch {
-    /* ignore */
-  }
-  return null
 }
 
 function lineRisk(line: MasterTreeNode) {
