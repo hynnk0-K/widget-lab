@@ -35,9 +35,23 @@ export function worstRisk(levels: WbgtRiskLevel[]): WbgtRiskLevel {
   return worst
 }
 
-// ponytail: 백엔드 WBGT 센서 API 준비 전까지 라인 ID 기반 결정적 mock 값. API 연동 시 교체.
-export function getMockWbgt(lineId: number): number {
-  const t = Math.floor(Date.now() / 60_000)
-  const wave = Math.sin(lineId * 1.37 + t * 0.1)
+// ponytail: 백엔드 WBGT 센서 API 준비 전까지 라인 ID + 분 단위 시간 버킷 기반 결정적 mock 값. API 연동 시 교체.
+function wbgtAt(lineId: number, minuteBucket: number): number {
+  const wave = Math.sin(lineId * 1.37 + minuteBucket * 0.1)
   return Math.round((30 + wave * 8) * 10) / 10
+}
+
+export function getMockWbgt(lineId: number): number {
+  return wbgtAt(lineId, Math.floor(Date.now() / 60_000))
+}
+
+// 디테일 차트용: 최근 N분간 1분 간격 mock 추이
+export function getMockWbgtTrend(lineId: number, minutes = 30): { ts: number; value: number }[] {
+  const nowBucket = Math.floor(Date.now() / 60_000)
+  const points: { ts: number; value: number }[] = []
+  for (let i = minutes; i >= 0; i--) {
+    const bucket = nowBucket - i
+    points.push({ ts: bucket * 60_000, value: wbgtAt(lineId, bucket) })
+  }
+  return points
 }

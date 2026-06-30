@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
+import ReactECharts from 'echarts-for-react'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { api } from '@/shared/lib/api'
-import { WbgtZoneMap, type WbgtZonePin } from './WbgtZoneMap'
-import { WBGT_RISK_COLOR, WBGT_RISK_LABEL, getMockWbgt, wbgtToRisk, worstRisk } from './wbgtRisk'
+import { WbgtZoneMap, type WbgtZonePin, type WbgtZoneSummary } from './WbgtZoneMap'
+import {
+  WBGT_RISK_COLOR,
+  WBGT_RISK_LABEL,
+  getMockWbgt,
+  getMockWbgtTrend,
+  wbgtToRisk,
+  worstRisk,
+} from './wbgtRisk'
 
 interface MasterTreeNode {
   type: string
   id: number
   code: string
   name: string
-  position?: string | null
   children?: MasterTreeNode[]
 }
 
@@ -17,6 +24,12 @@ interface LayoutImageDto {
   imageBase64: string | null
   width: number | null
   height: number | null
+}
+
+// /master/tree는 좌표를 안 내려줌 — 좌표는 공정/라인 DTO에만 있어서 별도 조회
+interface PositionedDto {
+  id: number
+  position: string | null
 }
 
 function children(node: MasterTreeNode, type: string): MasterTreeNode[] {
@@ -66,7 +79,14 @@ export function RealtimeWbgtPage() {
   const [view, setView] = useState<View>({ level: 'factories' })
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
   const [imageLoading, setImageLoading] = useState(false)
+  const [positions, setPositions] = useState<Record<number, { x: number; y: number } | null>>({})
+  const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
   const [tick, setTick] = useState(0)
+
+  // 화면 전환(드릴다운/브레드크럼) 시 이전 선택은 해제
+  useEffect(() => {
+    setSelectedLineId(null)
+  }, [view])
 
   useEffect(() => {
     api
@@ -91,24 +111,30 @@ export function RealtimeWbgtPage() {
   const selectedSite = sites.find((s) => s.id === siteId) ?? null
   const factories = useMemo(() => (selectedSite ? children(selectedSite, 'factory') : []), [selectedSite])
 
-  // 도면(공장/공정) 이미지 로드
+  // 도면(공장/공정) 이미지 + 하위 노드 좌표 로드
   useEffect(() => {
     if (view.level === 'factories') {
       setImage(null)
+      setPositions({})
       return
     }
     const id = view.level === 'factory' ? view.factory.id : view.process.id
     const path = view.level === 'factory' ? 'factories' : 'processes'
+    const childPath = view.level === 'factory' ? `/master/processes?factoryId=${id}` : `/master/lines?processId=${id}`
     setImageLoading(true)
-    api
-      .get<LayoutImageDto>(`/master/${path}/${id}/image`)
-      .catch(() => null)
-      .then((data) => {
+    Promise.all([
+      api.get<LayoutImageDto>(`/master/${path}/${id}/image`).catch(() => null),
+      api.get<PositionedDto[]>(childPath).catch(() => []),
+    ])
+      .then(([data, childList]) => {
         if (data?.imageBase64 && data.width && data.height) {
           setImage({ base64: data.imageBase64, width: data.width, height: data.height })
         } else {
           setImage(null)
         }
+        const map: Record<number, { x: number; y: number } | null> = {}
+        for (const c of childList) map[c.id] = parsePosition(c.position)
+        setPositions(map)
       })
       .finally(() => setImageLoading(false))
   }, [view])
@@ -119,7 +145,7 @@ export function RealtimeWbgtPage() {
       return children(view.factory, 'process').map((p) => ({
         id: p.id,
         name: p.name,
-        position: parsePosition(p.position),
+        position: positions[p.id] ?? null,
         value: getMockWbgt(p.id),
         risk: nodeWorstRisk(p),
       }))
@@ -128,20 +154,78 @@ export function RealtimeWbgtPage() {
       return children(view.process, 'line').map((l) => ({
         id: l.id,
         name: l.name,
-        position: parsePosition(l.position),
+        position: positions[l.id] ?? null,
         value: getMockWbgt(l.id),
         risk: lineRisk(l),
+        selected: l.id === selectedLineId,
       }))
     }
     return []
-  }, [view, tick])
+  }, [view, tick, positions, selectedLineId])
+
+  // 공정에 센서(라인)가 여러 개면 그 위치들의 대략 중심에 요약 카드 오버레이
+  const processSummary: WbgtZoneSummary | null = useMemo(() => {
+    void tick
+    if (view.level !== 'process') return null
+    const lines = children(view.process, 'line')
+    if (lines.length < 2) return null
+    const pts = lines.map((l) => positions[l.id]).filter((p): p is { x: number; y: number } => !!p)
+    if (pts.length === 0) return null
+    return {
+      position: {
+        x: pts.reduce((sum, p) => sum + p.x, 0) / pts.length,
+        y: pts.reduce((sum, p) => sum + p.y, 0) / pts.length,
+      },
+      label: '공정 요약',
+      count: lines.length,
+      value: Math.max(...lines.map((l) => getMockWbgt(l.id))),
+      risk: worstRisk(lines.map(lineRisk)),
+    }
+  }, [view, tick, positions])
+
+  const selectedLine =
+    view.level === 'process' && selectedLineId !== null
+      ? (children(view.process, 'line').find((l) => l.id === selectedLineId) ?? null)
+      : null
+
+  const trendOption = useMemo(() => {
+    if (!selectedLine) return null
+    const points = getMockWbgtTrend(selectedLine.id, 30)
+    return {
+      grid: { top: 16, right: 16, bottom: 28, left: 36 },
+      tooltip: { trigger: 'axis' as const },
+      xAxis: {
+        type: 'category' as const,
+        data: points.map((p) => new Date(p.ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })),
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+        axisLabel: { color: '#94a3b8', fontSize: 10, interval: 4 },
+      },
+      yAxis: {
+        type: 'value' as const,
+        axisLine: { lineStyle: { color: '#cbd5e1' } },
+        axisLabel: { color: '#94a3b8', fontSize: 10 },
+        splitLine: { lineStyle: { color: '#e2e8f0', type: 'dashed' as const } },
+      },
+      series: [
+        {
+          type: 'line' as const,
+          smooth: true,
+          symbol: 'none',
+          data: points.map((p) => p.value),
+          lineStyle: { color: '#003087', width: 2 },
+          areaStyle: { color: 'rgba(0,48,135,0.08)' },
+        },
+      ],
+    }
+  }, [selectedLine, tick])
 
   function handlePinClick(id: number) {
     if (view.level === 'factory') {
       const process = children(view.factory, 'process').find((p) => p.id === id)
       if (process) setView({ level: 'process', factory: view.factory, process })
+    } else if (view.level === 'process') {
+      setSelectedLineId((prev) => (prev === id ? null : id))
     }
-    // 공정뷰의 라인 핀은 이미 값을 보여주고 있어 더 내려갈 곳이 없음
   }
 
   if (loading) {
@@ -156,7 +240,7 @@ export function RealtimeWbgtPage() {
 
   return (
     <ManagementLayout section="realtime">
-      <div className="flex flex-col gap-3 p-5 h-full overflow-auto">
+      <div className="flex flex-col gap-3 p-5 h-full overflow-hidden">
         {/* 브레드크럼 */}
         <div className="flex items-center gap-1.5 text-[13px]">
           <button
@@ -195,7 +279,7 @@ export function RealtimeWbgtPage() {
         </div>
 
         {view.level === 'factories' ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 flex-1 min-h-0 overflow-auto">
             {sites.length > 1 && (
               <select
                 value={siteId ?? ''}
@@ -231,11 +315,37 @@ export function RealtimeWbgtPage() {
             </div>
           </div>
         ) : imageLoading ? (
-          <div className="flex items-center justify-center h-40 text-[13px] text-slate-400">
+          <div className="flex-1 min-h-0 flex items-center justify-center text-[13px] text-slate-400">
             도면 불러오는 중...
           </div>
         ) : (
-          <WbgtZoneMap image={image} pins={pins} onPinClick={handlePinClick} />
+          <div className="flex-1 min-h-0 flex gap-3">
+            <div className="flex-1 min-w-0">
+              <WbgtZoneMap image={image} pins={pins} onPinClick={handlePinClick} summary={processSummary} />
+            </div>
+            {selectedLine && (
+              <div className="w-[300px] flex-shrink-0 bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-3 overflow-auto">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[14px] font-semibold text-slate-800 m-0">{selectedLine.name}</h3>
+                  <button
+                    onClick={() => setSelectedLineId(null)}
+                    className="text-slate-400 hover:text-slate-600 text-[12px]"
+                  >
+                    닫기
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[13px] font-bold px-2 py-0.5 rounded-full text-white ${WBGT_RISK_COLOR[lineRisk(selectedLine)]}`}
+                  >
+                    {getMockWbgt(selectedLine.id)}°C
+                  </span>
+                  <span className="text-[12px] text-slate-500">{WBGT_RISK_LABEL[lineRisk(selectedLine)]}</span>
+                </div>
+                {trendOption && <ReactECharts option={trendOption} style={{ height: 220 }} notMerge />}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </ManagementLayout>

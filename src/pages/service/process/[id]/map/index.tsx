@@ -47,11 +47,21 @@ interface LineDto {
   updatedAt: string
 }
 
-function parsePosition(raw: string | null): { x: number; y: number } | null {
+// position 컬럼은 JSON 문자열 {x, y, w?, h?} — w/h는 카드 사이즈(없으면 기본값)
+function parsePosition(
+  raw: string | null,
+): { x: number; y: number; width?: number; height?: number } | null {
   if (!raw) return null
   try {
     const p = JSON.parse(raw)
-    if (typeof p?.x === 'number' && typeof p?.y === 'number') return { x: p.x, y: p.y }
+    if (typeof p?.x === 'number' && typeof p?.y === 'number') {
+      return {
+        x: p.x,
+        y: p.y,
+        width: typeof p?.w === 'number' ? p.w : undefined,
+        height: typeof p?.h === 'number' ? p.h : undefined,
+      }
+    }
   } catch {
     /* ignore */
   }
@@ -126,13 +136,17 @@ export function ProcessMapPage() {
   }, [processId])
 
   const pins: MapPin[] = useMemo(() => {
-    return lines.map((l) => ({
-      id: l.id,
-      code: l.code,
-      name: l.name,
-      position: parsePosition(l.position),
-      live: { hasData: false },
-    }))
+    return lines.map((l) => {
+      const parsed = parsePosition(l.position)
+      return {
+        id: l.id,
+        code: l.code,
+        name: l.name,
+        position: parsed ? { x: parsed.x, y: parsed.y } : null,
+        size: parsed?.width && parsed?.height ? { width: parsed.width, height: parsed.height } : undefined,
+        live: { hasData: false },
+      }
+    })
   }, [lines])
 
   // 드래그/리사이즈 중 매번 PUT 보내지 않도록 디바운스
@@ -158,10 +172,10 @@ export function ProcessMapPage() {
     setImage(null)
   }
 
-  async function handlePinMove(pinId: number | string, position: { x: number; y: number }) {
+  async function savePosition(pinId: number | string, x: number, y: number, width?: number, height?: number) {
     const target = lines.find((l) => l.id === pinId)
     if (!target) return
-    const positionJson = JSON.stringify(position)
+    const positionJson = JSON.stringify({ x, y, ...(width && height ? { w: width, h: height } : {}) })
     await api.put<LineDto>(`/master/lines/${pinId}`, {
       processId: target.processId,
       code: target.code,
@@ -172,6 +186,17 @@ export function ProcessMapPage() {
       imageHeight: target.imageHeight,
     })
     setLines((prev) => prev.map((l) => (l.id === pinId ? { ...l, position: positionJson } : l)))
+  }
+
+  function handlePinMove(pinId: number | string, position: { x: number; y: number }) {
+    const existing = parsePosition(lines.find((l) => l.id === pinId)?.position ?? null)
+    return savePosition(pinId, position.x, position.y, existing?.width, existing?.height)
+  }
+
+  function handlePinResize(pinId: number | string, size: { width: number; height: number }) {
+    const existing = parsePosition(lines.find((l) => l.id === pinId)?.position ?? null)
+    if (!existing) return Promise.resolve()
+    return savePosition(pinId, existing.x, existing.y, size.width, size.height)
   }
 
   function handlePinClick(pinId: number | string) {
@@ -282,9 +307,11 @@ export function ProcessMapPage() {
           image={image}
           pins={pins}
           editMode={editMode}
+          pinStyle="card"
           onImageUpload={handleImageUpload}
           onImageDelete={handleImageDelete}
           onPinMove={handlePinMove}
+          onPinResize={handlePinResize}
           onPinClick={handlePinClick}
         />
       ) : (

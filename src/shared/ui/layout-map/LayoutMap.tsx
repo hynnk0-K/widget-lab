@@ -6,12 +6,15 @@ export function LayoutMap({
   image,
   pins,
   editMode = false,
+  pinStyle = 'dot',
   onPinClick,
   onImageUpload,
   onImageDelete,
   onPinMove,
+  onPinResize,
 }: LayoutMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const stageRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const [uploading, setUploading] = useState(false)
@@ -125,35 +128,39 @@ export function LayoutMap({
     )
   }
 
-  // 도면 있을 때
-  const scale = containerSize.width > 0 ? containerSize.width / image.width : 1
+  // 도면 있을 때 — 화면 영역(가로/세로) 안에 맞춰 축소(contain)
+  const scale =
+    containerSize.width > 0 && containerSize.height > 0
+      ? Math.min(containerSize.width / image.width, containerSize.height / image.height)
+      : 1
+  const displayWidth = image.width * scale
   const displayHeight = image.height * scale
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-white rounded-xl border border-slate-200 overflow-hidden"
-      style={{ minHeight: 480 }}
+      className="relative w-full h-[70vh] max-h-full min-h-[480px] bg-white rounded-xl border border-slate-200 overflow-hidden flex items-center justify-center"
     >
-      <img
-        src={image.base64}
-        alt="layout"
-        className="w-full block"
-        style={{ height: displayHeight }}
-      />
+      <div ref={stageRef} className="relative" style={{ width: displayWidth, height: displayHeight }}>
+        <img src={image.base64} alt="layout" className="w-full h-full block" />
 
-      <div className="absolute inset-0 pointer-events-none">
-        {pins.map((pin) => (
-          <PinView
-            key={pin.id}
-            pin={pin}
-            scale={scale}
-            editMode={editMode}
-            containerRef={containerRef}
-            onClick={onPinClick}
-            onMove={onPinMove}
-          />
-        ))}
+        <div className="absolute inset-0 pointer-events-none">
+          {pins.map((pin) => {
+            const Pin = pinStyle === 'card' ? PinCardView : PinView
+            return (
+              <Pin
+                key={pin.id}
+                pin={pin}
+                scale={scale}
+                editMode={editMode}
+                containerRef={stageRef}
+                onClick={onPinClick}
+                onMove={onPinMove}
+                onResize={onPinResize}
+              />
+            )
+          })}
+        </div>
       </div>
 
       {/* 우상단 정보 */}
@@ -229,7 +236,7 @@ export function LayoutMap({
   )
 }
 
-// ─── 핀 (드래그 가능 버전) ──────────────────────────
+// ─── 핀 공통 — 드래그 로직 + 상태 색상 ──────────────────────────
 interface PinViewProps {
   pin: MapPin
   scale: number
@@ -237,41 +244,82 @@ interface PinViewProps {
   containerRef: React.RefObject<HTMLDivElement | null>
   onClick?: (id: number | string) => void
   onMove?: (id: number | string, position: { x: number; y: number }) => Promise<void>
+  onResize?: (id: number | string, size: { width: number; height: number }) => Promise<void>
 }
 
-function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinViewProps) {
-  const [hovered, setHovered] = useState(false)
+const CARD_DEFAULT_SIZE = { width: 120, height: 40 }
+const CARD_MIN_SIZE = { width: 60, height: 28 }
+
+// 'card' 스타일 전용 — 모서리 드래그로 폭/높이 조절 (중심 좌표는 고정, 양쪽으로 커짐)
+function useResizablePin(
+  pin: MapPin,
+  scale: number,
+  editMode: boolean,
+  onResize?: (id: number | string, size: { width: number; height: number }) => Promise<void>,
+) {
+  const [resizing, setResizing] = useState(false)
+  const [tempSize, setTempSize] = useState<{ width: number; height: number } | null>(null)
+  const latestRef = useRef<{ width: number; height: number } | null>(null)
+
+  function handleResizeStart(e: React.MouseEvent) {
+    if (!editMode || !onResize) return
+    const resize = onResize
+    e.preventDefault()
+    e.stopPropagation()
+
+    const base = pin.size ?? CARD_DEFAULT_SIZE
+    const startX = e.clientX
+    const startY = e.clientY
+    setResizing(true)
+
+    function handleMouseMove(ev: MouseEvent) {
+      const dx = (ev.clientX - startX) / scale
+      const dy = (ev.clientY - startY) / scale
+      const next = {
+        width: Math.max(CARD_MIN_SIZE.width, Math.round(base.width + dx * 2)),
+        height: Math.max(CARD_MIN_SIZE.height, Math.round(base.height + dy * 2)),
+      }
+      latestRef.current = next
+      setTempSize(next)
+    }
+
+    async function handleMouseUp() {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      setResizing(false)
+      if (latestRef.current) {
+        try {
+          await resize(pin.id, latestRef.current)
+        } catch {
+          setTempSize(null)
+        }
+      }
+      latestRef.current = null
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  useEffect(() => {
+    setTempSize(null)
+  }, [pin.size?.width, pin.size?.height])
+
+  return { resizing, currentSize: tempSize ?? pin.size ?? CARD_DEFAULT_SIZE, handleResizeStart }
+}
+
+function useDraggablePin(
+  pin: MapPin,
+  scale: number,
+  editMode: boolean,
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  onMove?: (id: number | string, position: { x: number; y: number }) => Promise<void>,
+) {
   const [dragging, setDragging] = useState(false)
   // 드래그 중 임시 위치 (원본 이미지 좌표 기준)
   const [tempPos, setTempPos] = useState<{ x: number; y: number } | null>(null)
   const dragStartedRef = useRef(false)
 
-  if (!pin.position) return null
-
-  // 표시할 좌표 = 드래그 중이면 임시 좌표, 아니면 props 좌표
-  const currentPos = tempPos ?? pin.position
-  const x = currentPos.x * scale
-  const y = currentPos.y * scale
-
-  // const hasLive = pin.live?.hasData
-  // const pinColor = hasLive ? 'bg-green-500' : 'bg-slate-400'
-  const hasLive = pin.live?.hasData
-  const alarmStatus = pin.alarmStatus
-
-  // 알람 우선: critical > warning > 실시간 데이터 여부
-  const pinColor =
-    alarmStatus === 'critical'
-      ? 'bg-red-500'
-      : alarmStatus === 'warning'
-        ? 'bg-amber-500'
-        : hasLive
-          ? 'bg-green-500'
-          : 'bg-slate-400'
-
-  // 펄스 애니메이션도 알람 발생 시
-  const showPulse = alarmStatus === 'critical' || alarmStatus === 'warning' || hasLive
-
-  // 드래그 시작
   function handleMouseDown(e: React.MouseEvent) {
     if (!editMode || !onMove) return
     e.preventDefault()
@@ -323,11 +371,46 @@ function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinVie
     window.addEventListener('mouseup', handleMouseUp)
   }
 
-  // 부모 props의 position이 바뀌면 tempPos 초기화
-  // (저장 후 부모에서 새 position 내려옴)
+  // 부모 props의 position이 바뀌면 tempPos 초기화 (저장 후 부모에서 새 position 내려옴)
   useEffect(() => {
     setTempPos(null)
   }, [pin.position?.x, pin.position?.y])
+
+  return { dragging, tempPos, currentPos: tempPos ?? pin.position, dragStartedRef, handleMouseDown }
+}
+
+function pinStatusColor(pin: MapPin) {
+  const hasLive = pin.live?.hasData
+  const alarmStatus = pin.alarmStatus
+  // 알람 우선: critical > warning > 실시간 데이터 여부
+  const color =
+    alarmStatus === 'critical'
+      ? 'bg-red-500'
+      : alarmStatus === 'warning'
+        ? 'bg-amber-500'
+        : hasLive
+          ? 'bg-green-500'
+          : 'bg-slate-400'
+  const showPulse = alarmStatus === 'critical' || alarmStatus === 'warning' || Boolean(hasLive)
+  return { color, showPulse }
+}
+
+// ─── 핀 — 원형(기본) ──────────────────────────
+function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinViewProps) {
+  const [hovered, setHovered] = useState(false)
+  const { dragging, tempPos, currentPos, dragStartedRef, handleMouseDown } = useDraggablePin(
+    pin,
+    scale,
+    editMode,
+    containerRef,
+    onMove,
+  )
+
+  if (!pin.position || !currentPos) return null
+
+  const x = currentPos.x * scale
+  const y = currentPos.y * scale
+  const { color: pinColor, showPulse } = pinStatusColor(pin)
 
   return (
     <div
@@ -402,6 +485,84 @@ function PinView({ pin, scale, editMode, containerRef, onClick, onMove }: PinVie
       {dragging && tempPos && (
         <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 translate-y-full bg-blue-600 text-white text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-mono">
           ({tempPos.x}, {tempPos.y})
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── 핀 — 이름이 보이는 드래그/리사이즈 가능한 카드(사각형) ──────────────────────────
+function PinCardView({ pin, scale, editMode, containerRef, onClick, onMove, onResize }: PinViewProps) {
+  const { dragging, tempPos, currentPos, dragStartedRef, handleMouseDown } = useDraggablePin(
+    pin,
+    scale,
+    editMode,
+    containerRef,
+    onMove,
+  )
+  const { resizing, currentSize, handleResizeStart } = useResizablePin(pin, scale, editMode, onResize)
+
+  if (!pin.position || !currentPos) return null
+
+  const x = currentPos.x * scale
+  const y = currentPos.y * scale
+  const width = currentSize.width * scale
+  const height = currentSize.height * scale
+  const { color: statusColor, showPulse } = pinStatusColor(pin)
+  const active = dragging || resizing
+
+  return (
+    <div
+      className="absolute pointer-events-auto"
+      style={{
+        left: x,
+        top: y,
+        width,
+        height,
+        transform: 'translate(-50%, -50%)',
+        zIndex: active ? 30 : 1,
+      }}
+    >
+      <button
+        type="button"
+        onMouseDown={handleMouseDown}
+        onClick={(e) => {
+          // 드래그 후 click 이벤트 막기
+          if (dragStartedRef.current) {
+            e.preventDefault()
+            return
+          }
+          onClick?.(pin.id)
+        }}
+        className={[
+          'relative flex items-center gap-1.5 w-full h-full px-3 rounded-lg border-2 border-white bg-white/10 shadow-md transition-transform overflow-hidden',
+          editMode ? 'cursor-grab' : 'cursor-pointer',
+          dragging
+            ? 'cursor-grabbing scale-105 ring-4 ring-blue-300'
+            : pin.selected
+              ? 'ring-4 ring-blue-400'
+              : 'hover:shadow-lg',
+        ].join(' ')}
+      >
+        {showPulse && !active && (
+          <span className={`absolute -left-1 -top-1 w-2.5 h-2.5 rounded-full ${statusColor} animate-ping opacity-60`} />
+        )}
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor}`} />
+        <span className="text-[12px] font-semibold text-slate-800 truncate">{pin.name}</span>
+      </button>
+
+      {/* 리사이즈 핸들 — 편집 모드에서만 */}
+      {editMode && onResize && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute -right-1 -bottom-1 w-3 h-3 bg-white border-2 border-[#003087] rounded-sm cursor-nwse-resize"
+        />
+      )}
+
+      {/* 드래그/리사이즈 중 정보 표시 */}
+      {active && (
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 translate-y-full bg-blue-600 text-white text-[10px] rounded px-1.5 py-0.5 whitespace-nowrap font-mono">
+          {resizing ? `${currentSize.width}×${currentSize.height}` : tempPos ? `(${tempPos.x}, ${tempPos.y})` : ''}
         </div>
       )}
     </div>

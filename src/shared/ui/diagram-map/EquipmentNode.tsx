@@ -46,7 +46,7 @@ export function EquipmentNode({ data, selected }: NodeProps) {
 
   return (
     <div
-      className={`relative w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-1.5 rounded-lg border bg-white ${borderClass}`}
+      className={`relative w-full h-full flex flex-col items-center justify-center gap-1 px-2 py-1.5 rounded-lg border bg-white/10 ${borderClass}`}
     >
       <NodeResizer isVisible={selected} minWidth={56} minHeight={48} />
       {alarmStatus && (

@@ -37,7 +37,9 @@ import { RegularReportPage } from '@/pages/statistics/report/regular'
 import { CustomReportPage } from '@/pages/statistics/report/custom'
 import { ReportTemplatePage } from '@/pages/statistics/report/template'
 import { CompanyPage } from '@/pages/system/company'
+import { CompanyMapPage } from '@/pages/system/company/[id]/map'
 import { SitePage } from '@/pages/system/site'
+import { SiteMapPage } from '@/pages/system/site/[id]/map'
 
 import { TsdbComparePage } from '@/pages/demo/tsdb-compare'
 
@@ -123,7 +125,9 @@ function App() {
                     <Route path="/statistics/report/custom" element={<CustomReportPage />} />
                     <Route path="/statistics/report/template" element={<ReportTemplatePage />} />
                     <Route path="/system/company" element={<CompanyPage />} />
+                    <Route path="/system/company/:id/map" element={<CompanyMapPage />} />
                     <Route path="/system/site" element={<SitePage />} />
+                    <Route path="/system/site/:id/map" element={<SiteMapPage />} />
                     <Route path="/demo/tsdb-compare" element={<TsdbComparePage />} />
                   </Routes>
                 </Layout>

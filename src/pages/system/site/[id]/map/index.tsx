@@ -3,17 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
 import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
 
-interface FactoryDto {
+interface SiteDto {
   id: number
-  siteId: number
+  companyId: number
   code: string
   name: string
-  description: string | null
-  imageWidth: number | null
-  imageHeight: number | null
-  hasImage: boolean
+  address: string | null
   createdAt: string
-  updatedAt: string
 }
 
 interface LayoutImageDto {
@@ -23,77 +19,49 @@ interface LayoutImageDto {
   height: number | null
 }
 
-interface ProcessDto {
+interface FactoryDto {
   id: number
-  factoryId: number
+  siteId: number
   code: string
   name: string
   description: string | null
-  position: string | null
-  imageWidth: number | null
-  imageHeight: number | null
   hasImage: boolean
   createdAt: string
   updatedAt: string
 }
 
-// position 컬럼은 JSON 문자열 {x, y, w?, h?} — w/h는 카드 사이즈(없으면 기본값)
-function parsePosition(
-  raw: string | null,
-): { x: number; y: number; width?: number; height?: number } | null {
-  if (!raw) return null
-  try {
-    const p = JSON.parse(raw)
-    if (typeof p?.x === 'number' && typeof p?.y === 'number') {
-      return {
-        x: p.x,
-        y: p.y,
-        width: typeof p?.w === 'number' ? p.w : undefined,
-        height: typeof p?.h === 'number' ? p.h : undefined,
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return null
-}
-
-export function FactoryMapPage() {
+export function SiteMapPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const factoryId = Number(id)
+  const siteId = Number(id)
 
-  const [factory, setFactory] = useState<FactoryDto | null>(null)
+  const [site, setSite] = useState<SiteDto | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
-  const [processes, setProcesses] = useState<ProcessDto[]>([])
+  const [factories, setFactories] = useState<FactoryDto[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
 
   useEffect(() => {
-    if (!factoryId || Number.isNaN(factoryId)) return
+    if (!siteId || Number.isNaN(siteId)) return
     let active = true
     setLoading(true)
     setError('')
 
     Promise.all([
-      api.get<FactoryDto>(`/master/factories/${factoryId}`),
-      api.get<LayoutImageDto>(`/master/factories/${factoryId}/image`).catch(() => null),
-      api.get<ProcessDto[]>(`/master/processes?factoryId=${factoryId}`),
+      api.get<SiteDto>(`/master/sites/${siteId}`),
+      api.get<LayoutImageDto>(`/master/sites/${siteId}/image`).catch(() => null),
+      api.get<FactoryDto[]>(`/master/factories?siteId=${siteId}`),
     ])
-      .then(([factoryData, imgData, processesData]) => {
+      .then(([siteData, imgData, factoriesData]) => {
         if (!active) return
-        setFactory(factoryData)
+        setSite(siteData)
         if (imgData?.imageBase64 && imgData.width && imgData.height) {
-          setImage({
-            base64: imgData.imageBase64,
-            width: imgData.width,
-            height: imgData.height,
-          })
+          setImage({ base64: imgData.imageBase64, width: imgData.width, height: imgData.height })
         } else {
           setImage(null)
         }
-        setProcesses(processesData)
+        setFactories(factoriesData)
       })
       .catch((err) => {
         if (!active) return
@@ -106,26 +74,23 @@ export function FactoryMapPage() {
     return () => {
       active = false
     }
-  }, [factoryId])
+  }, [siteId])
 
-  // 공정들 → MapPin 변환 (실시간 데이터 없음)
+  // ponytail: 공장(Factory)에는 아직 position 필드가 없어 핀 위치를 못 둔다.
+  // 공정/라인처럼 backend FactoryDto/FactoryCreateRequest에 position 컬럼이 추가되면
+  // 아래 position을 parsePosition(f.position)으로 바꾸고 onPinMove도 연결할 것.
   const pins: MapPin[] = useMemo(() => {
-    return processes.map((p) => {
-      const parsed = parsePosition(p.position)
-      return {
-        id: p.id,
-        code: p.code,
-        name: p.name,
-        position: parsed ? { x: parsed.x, y: parsed.y } : null,
-        size: parsed?.width && parsed?.height ? { width: parsed.width, height: parsed.height } : undefined,
-        // 공정은 실시간 데이터 직접 없음 (그냥 회색 핀)
-        live: { hasData: false },
-      }
-    })
-  }, [processes])
+    return factories.map((f) => ({
+      id: f.id,
+      code: f.code,
+      name: f.name,
+      position: null,
+      live: { hasData: false },
+    }))
+  }, [factories])
 
   async function handleImageUpload(base64: string, width: number, height: number) {
-    await api.put<LayoutImageDto>(`/master/factories/${factoryId}/image`, {
+    await api.put<LayoutImageDto>(`/master/sites/${siteId}/image`, {
       imageBase64: base64,
       width,
       height,
@@ -134,41 +99,13 @@ export function FactoryMapPage() {
   }
 
   async function handleImageDelete() {
-    await api.delete(`/master/factories/${factoryId}/image`)
+    await api.delete(`/master/sites/${siteId}/image`)
     setImage(null)
   }
 
-  // 공정의 position 변경은 PUT으로 전체 업데이트 (별도 PATCH API 없음)
-  async function savePosition(pinId: number | string, x: number, y: number, width?: number, height?: number) {
-    const target = processes.find((p) => p.id === pinId)
-    if (!target) return
-    const positionJson = JSON.stringify({ x, y, ...(width && height ? { w: width, h: height } : {}) })
-    await api.put<ProcessDto>(`/master/processes/${pinId}`, {
-      factoryId: target.factoryId,
-      code: target.code,
-      name: target.name,
-      description: target.description,
-      position: positionJson,
-      imageWidth: target.imageWidth,
-      imageHeight: target.imageHeight,
-    })
-    setProcesses((prev) => prev.map((p) => (p.id === pinId ? { ...p, position: positionJson } : p)))
-  }
-
-  function handlePinMove(pinId: number | string, position: { x: number; y: number }) {
-    const existing = parsePosition(processes.find((p) => p.id === pinId)?.position ?? null)
-    return savePosition(pinId, position.x, position.y, existing?.width, existing?.height)
-  }
-
-  function handlePinResize(pinId: number | string, size: { width: number; height: number }) {
-    const existing = parsePosition(processes.find((p) => p.id === pinId)?.position ?? null)
-    if (!existing) return Promise.resolve()
-    return savePosition(pinId, existing.x, existing.y, size.width, size.height)
-  }
-
-  // 공정 핀 클릭 → 공정 도면 페이지로 이동 (계층 탐색)
+  // 공장 핀 클릭 → 공장 도면 페이지로 이동 (계층 탐색)
   function handlePinClick(pinId: number | string) {
-    navigate(`/service/process/${pinId}/map`)
+    navigate(`/service/factory/${pinId}/map`)
   }
 
   if (loading) {
@@ -187,10 +124,10 @@ export function FactoryMapPage() {
       <div className="flex flex-col items-center justify-center min-h-[480px] bg-red-50 rounded-xl border border-red-200">
         <p className="text-[14px] text-red-600 m-0">{error}</p>
         <button
-          onClick={() => navigate('/service/factory')}
+          onClick={() => navigate('/system/site')}
           className="mt-3 h-8 px-4 text-[12px] text-red-600 underline"
         >
-          공장 목록으로
+          사업장 목록으로
         </button>
       </div>
     )
@@ -201,16 +138,16 @@ export function FactoryMapPage() {
       <div className="flex items-center justify-between">
         <div>
           <button
-            onClick={() => navigate('/service/factory')}
+            onClick={() => navigate('/system/site')}
             className="text-[12px] text-slate-400 hover:text-slate-600"
           >
-            ← 공장 목록
+            ← 사업장 목록
           </button>
           <h1 className="m-0 mt-1 text-[20px] font-bold text-slate-900 leading-tight">
-            {factory?.name ?? '공장'} <span className="text-slate-400 font-normal">도면</span>
+            {site?.name ?? '사업장'} <span className="text-slate-400 font-normal">도면</span>
           </h1>
           <p className="m-0 text-[12px] text-slate-400 mt-0.5">
-            공정 {processes.length}개 · 핀 클릭 시 해당 공정 도면으로 이동
+            공장 {factories.length}개 · 핀 클릭 시 해당 공장 도면으로 이동
           </p>
         </div>
 
@@ -250,11 +187,8 @@ export function FactoryMapPage() {
         image={image}
         pins={pins}
         editMode={editMode}
-        pinStyle="card"
         onImageUpload={handleImageUpload}
         onImageDelete={handleImageDelete}
-        onPinMove={handlePinMove}
-        onPinResize={handlePinResize}
         onPinClick={handlePinClick}
       />
     </div>
