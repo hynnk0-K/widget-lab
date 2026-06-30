@@ -1,52 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { parsePosition } from '@/shared/lib/parsePosition'
-import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
-
-interface FactoryDto {
-  id: number
-  siteId: number
-  code: string
-  name: string
-  description: string | null
-  imageWidth: number | null
-  imageHeight: number | null
-  hasImage: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-interface LayoutImageDto {
-  id: number
-  imageBase64: string | null
-  width: number | null
-  height: number | null
-}
-
-interface ProcessDto {
-  id: number
-  factoryId: number
-  code: string
-  name: string
-  description: string | null
-  position: string | null
-  imageWidth: number | null
-  imageHeight: number | null
-  hasImage: boolean
-  createdAt: string
-  updatedAt: string
-}
-
+import { LayoutMap, type MapPin } from '@/widgets/layout-map'
+import {
+  getFactory,
+  getFactoryImage,
+  putFactoryImage,
+  deleteFactoryImage,
+} from '@/entities/factory/api/factoryApi'
+import type { Factory } from '@/entities/factory/model/types'
+import { listProcesses, updateProcess } from '@/entities/process/api/processApi'
+import type { Process } from '@/entities/process/model/types'
 
 export function FactoryMapPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const factoryId = Number(id)
 
-  const [factory, setFactory] = useState<FactoryDto | null>(null)
+  const [factory, setFactory] = useState<Factory | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
-  const [processes, setProcesses] = useState<ProcessDto[]>([])
+  const [processes, setProcesses] = useState<Process[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
@@ -58,9 +31,9 @@ export function FactoryMapPage() {
     setError('')
 
     Promise.all([
-      api.get<FactoryDto>(`/master/factories/${factoryId}`),
-      api.get<LayoutImageDto>(`/master/factories/${factoryId}/image`).catch(() => null),
-      api.get<ProcessDto[]>(`/master/processes?factoryId=${factoryId}`),
+      getFactory(factoryId),
+      getFactoryImage(factoryId).catch(() => null),
+      listProcesses(factoryId),
     ])
       .then(([factoryData, imgData, processesData]) => {
         if (!active) return
@@ -106,16 +79,12 @@ export function FactoryMapPage() {
   }, [processes])
 
   async function handleImageUpload(base64: string, width: number, height: number) {
-    await api.put<LayoutImageDto>(`/master/factories/${factoryId}/image`, {
-      imageBase64: base64,
-      width,
-      height,
-    })
+    await putFactoryImage(factoryId, { imageBase64: base64, width, height })
     setImage({ base64, width, height })
   }
 
   async function handleImageDelete() {
-    await api.delete(`/master/factories/${factoryId}/image`)
+    await deleteFactoryImage(factoryId)
     setImage(null)
   }
 
@@ -124,11 +93,11 @@ export function FactoryMapPage() {
     const target = processes.find((p) => p.id === pinId)
     if (!target) return
     const positionJson = JSON.stringify({ x, y, ...(width && height ? { w: width, h: height } : {}) })
-    await api.put<ProcessDto>(`/master/processes/${pinId}`, {
+    await updateProcess(Number(pinId), {
       factoryId: target.factoryId,
       code: target.code,
       name: target.name,
-      description: target.description,
+      description: target.description ?? '',
       position: positionJson,
       imageWidth: target.imageWidth,
       imageHeight: target.imageHeight,

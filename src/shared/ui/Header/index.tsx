@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cn } from '@/shared/lib/cn'
 import { api } from '@/shared/lib/api'
-import { useAuthStore } from '@/shared/store/auth'
+import { useAuthStore } from '@/entities/user/model/authStore'
 
 const NAV_ITEMS = [
   { label: '실시간 모니터링', href: '/realtime/dashboard', exact: false },

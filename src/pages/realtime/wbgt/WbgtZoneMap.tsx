@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { WBGT_RISK_COLOR, WBGT_RISK_LABEL, type WbgtRiskLevel } from './wbgtRisk'
+import { WBGT_RISK_COLOR, WBGT_RISK_LABEL, type WbgtRiskLevel } from '@/entities/wbgt/model/wbgtRisk'
 
 export interface WbgtZonePin {
   id: number

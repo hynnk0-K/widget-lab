@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { api } from '@/shared/lib/api'
-import { useAuthStore } from '@/shared/store/auth'
+import { useAuthStore } from '@/entities/user/model/authStore'
 
 type Tab = 'login' | 'signup'
 

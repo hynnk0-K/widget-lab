@@ -11,7 +11,7 @@ import {
   getMockWbgtTrend,
   wbgtToRisk,
   worstRisk,
-} from './wbgtRisk'
+} from '@/entities/wbgt/model/wbgtRisk'
 
 interface MasterTreeNode {
   type: string

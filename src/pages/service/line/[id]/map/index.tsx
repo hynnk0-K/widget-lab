@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
-import { DiagramMap } from '@/shared/ui/diagram-map'
+import { DiagramMap } from '@/widgets/diagram-map'
 import {
   loadDiagram,
   saveDiagram,
@@ -10,54 +9,10 @@ import {
   type DiagramData,
 } from '@/shared/lib/diagramStorage'
 import { readImageFile } from '@/shared/lib/readImageFile'
-
-// ── 백엔드 DTO 타입 ─────────────────────────────────
-interface LineDto {
-  id: number
-  processId: number
-  code: string
-  name: string
-  description: string | null
-  position: string | null
-  imageWidth: number | null
-  imageHeight: number | null
-  hasImage: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-interface LayoutImageDto {
-  id: number
-  imageBase64: string | null
-  width: number | null
-  height: number | null
-}
-
-interface EquipmentDto {
-  id: number
-  lineId: number
-  code: string
-  name: string
-  equipmentType: string | null
-  model: string | null
-  manufacturer: string | null
-  installedAt: string | null
-  position: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-interface EquipmentLive {
-  id: number
-  lineId: number
-  code: string
-  name: string
-  equipmentType: string
-  isActive: boolean
-  hasData: boolean
-  lastDataAt: string | null
-}
+import { getLine, getLineImage, putLineImage, deleteLineImage } from '@/entities/line/api/lineApi'
+import type { Line } from '@/entities/line/model/types'
+import { listEquipments, listEquipmentLive } from '@/entities/equipment/api/equipmentApi'
+import type { EquipmentDto, EquipmentLive } from '@/entities/equipment/model/types'
 
 const LIVE_POLL_MS = 5000
 
@@ -66,7 +21,7 @@ export function LineMapPage() {
   const navigate = useNavigate()
   const lineId = Number(id)
 
-  const [line, setLine] = useState<LineDto | null>(null)
+  const [line, setLine] = useState<Line | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
   const [equipments, setEquipments] = useState<EquipmentDto[]>([])
   const [liveMap, setLiveMap] = useState<Record<string, EquipmentLive>>({})
@@ -91,10 +46,10 @@ export function LineMapPage() {
     setError('')
 
     Promise.all([
-      api.get<LineDto>(`/master/lines/${lineId}`),
-      api.get<LayoutImageDto>(`/master/lines/${lineId}/image`).catch(() => null),
-      api.get<EquipmentDto[]>(`/master/equipments?lineId=${lineId}`),
-      api.get<EquipmentLive[]>(`/equipment-live?lineId=${lineId}`),
+      getLine(lineId),
+      getLineImage(lineId).catch(() => null),
+      listEquipments(lineId),
+      listEquipmentLive(lineId),
       loadDiagram('line', lineId),
     ])
       .then(([lineData, imgData, equipsData, liveData, diagramData]) => {
@@ -140,8 +95,7 @@ export function LineMapPage() {
   useEffect(() => {
     if (!lineId || Number.isNaN(lineId)) return
     const timer = setInterval(() => {
-      api
-        .get<EquipmentLive[]>(`/equipment-live?lineId=${lineId}`)
+      listEquipmentLive(lineId)
         .then((live) => setLiveMap(Object.fromEntries(live.map((l) => [l.code, l]))))
         .catch(() => {
           /* ignore polling errors */
@@ -152,16 +106,12 @@ export function LineMapPage() {
 
   // ── 핸들러 ──
   async function handleImageUpload(base64: string, width: number, height: number) {
-    await api.put<LayoutImageDto>(`/master/lines/${lineId}/image`, {
-      imageBase64: base64,
-      width,
-      height,
-    })
+    await putLineImage(lineId, { imageBase64: base64, width, height })
     setImage({ base64, width, height })
   }
 
   async function handleImageDelete() {
-    await api.delete(`/master/lines/${lineId}/image`)
+    await deleteLineImage(lineId)
     setImage(null)
   }
 

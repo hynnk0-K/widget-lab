@@ -1,4 +1,6 @@
-import { useAuthStore } from '@/shared/store/auth'
+// ponytail: shared layer가 entities/user를 참조하는 FSD 경계 예외 — http 클라이언트가 토큰을 읽어야 해서 불가피.
+// 더 엄격하게 하려면 인터셉터/DI 패턴으로 분리할 것.
+import { useAuthStore } from '@/entities/user/model/authStore'
 
 const BASE = 'http://localhost:8080/api'
 

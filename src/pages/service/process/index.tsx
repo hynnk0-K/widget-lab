@@ -1,25 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
+import { listFactories } from '@/entities/factory/api/factoryApi'
+import { listProcesses, createProcess, updateProcess, deleteProcess } from '@/entities/process/api/processApi'
+import type { Process } from '@/entities/process/model/types'
 
 interface Factory {
   id: number
   name: string
 }
-interface Process {
-  id: number
+interface ProcessRow extends Process {
   factory?: Factory
-  factoryId?: number
   factoryName?: string
-  code: string
-  name: string
-  description?: string
 }
 
 function buildColumns(navigate: (path: string) => void): Column[] {
@@ -69,29 +66,26 @@ function buildColumns(navigate: (path: string) => void): Column[] {
 const EMPTY: Record<string, string> = { factoryId: '', code: '', name: '', description: '' }
 
 export function ProcessPage() {
-  const [rows, setRows] = useState<Process[]>([])
+  const [rows, setRows] = useState<ProcessRow[]>([])
   const [loading, setLoading] = useState(true)
   const [factories, setFactories] = useState<Factory[]>([])
   const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Process | null>(null)
+  const [editTarget, setEditTarget] = useState<ProcessRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<Process[]>([])
+  const [deleteTargets, setDeleteTargets] = useState<ProcessRow[]>([])
 
   const navigate = useNavigate()
   const columns = buildColumns(navigate)
 
   useEffect(() => {
     loadRows()
-    api
-      .get<Factory[]>('/master/factories')
-      .then(setFactories)
-      .catch(() => setFactories([]))
+    listFactories().then(setFactories).catch(() => setFactories([]))
   }, [])
 
   async function loadRows() {
     setLoading(true)
     try {
-      setRows(await api.get<Process[]>('/master/processes'))
+      setRows(await listProcesses())
     } catch {
       setRows([])
     } finally {
@@ -106,7 +100,7 @@ export function ProcessPage() {
   }
 
   function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as Process
+    const r = row as unknown as ProcessRow
     setEditTarget(r)
     setFormValues({
       factoryId: String(r.factory?.id ?? r.factoryId ?? ''),
@@ -125,9 +119,9 @@ export function ProcessPage() {
       description: formValues.description,
     }
     if (editTarget) {
-      await api.put(`/master/processes/${editTarget.id}`, body)
+      await updateProcess(editTarget.id, body)
     } else {
-      await api.post('/master/processes', body)
+      await createProcess(body)
     }
     setFormOpen(false)
     loadRows()
@@ -135,7 +129,7 @@ export function ProcessPage() {
 
   async function handleDelete() {
     for (const t of deleteTargets) {
-      await api.delete(`/master/processes/${t.id}`)
+      await deleteProcess(t.id)
     }
     setDeleteTargets([])
     loadRows()
@@ -162,7 +156,7 @@ export function ProcessPage() {
         loading={loading}
         onAdd={openCreate}
         onEdit={openEdit}
-        onDelete={(selected) => setDeleteTargets(selected as unknown as Process[])}
+        onDelete={(selected) => setDeleteTargets(selected as unknown as ProcessRow[])}
         searchPlaceholder="공정 검색"
       />
       {formOpen && (

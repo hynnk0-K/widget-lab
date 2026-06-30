@@ -1,19 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
-
-interface Company {
-  id: number
-  code: string
-  name: string
-  description?: string
-}
+import { listCompanies, createCompany, updateCompany, deleteCompany } from '@/entities/company/api/companyApi'
+import type { Company } from '@/entities/company/model/types'
 
 const FIELDS: FormField[] = [
   { key: 'code', label: '코드', type: 'text', required: true, placeholder: 'COMP-001' },
@@ -64,7 +58,7 @@ export function CompanyPage() {
   async function loadRows() {
     setLoading(true)
     try {
-      setRows(await api.get<Company[]>('/master/companies'))
+      setRows(await listCompanies())
     } catch {
       setRows([])
     } finally {
@@ -88,9 +82,9 @@ export function CompanyPage() {
   async function handleSubmit() {
     const body = { code: formValues.code, name: formValues.name, description: formValues.description }
     if (editTarget) {
-      await api.put(`/master/companies/${editTarget.id}`, body)
+      await updateCompany(editTarget.id, body)
     } else {
-      await api.post('/master/companies', body)
+      await createCompany(body)
     }
     setFormOpen(false)
     loadRows()
@@ -98,7 +92,7 @@ export function CompanyPage() {
 
   async function handleDelete() {
     for (const t of deleteTargets) {
-      await api.delete(`/master/companies/${t.id}`)
+      await deleteCompany(t.id)
     }
     setDeleteTargets([])
     loadRows()

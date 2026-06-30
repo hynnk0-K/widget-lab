@@ -1,40 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
-import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
-
-interface CompanyDto {
-  id: number
-  code: string
-  name: string
-  description: string | null
-  createdAt: string
-}
-
-interface LayoutImageDto {
-  id: number
-  imageBase64: string | null
-  width: number | null
-  height: number | null
-}
-
-interface SiteDto {
-  id: number
-  companyId: number
-  code: string
-  name: string
-  address: string | null
-  createdAt: string
-}
+import { LayoutMap, type MapPin } from '@/widgets/layout-map'
+import { getCompany, getCompanyImage, putCompanyImage, deleteCompanyImage } from '@/entities/company/api/companyApi'
+import type { Company } from '@/entities/company/model/types'
+import { listSites } from '@/entities/site/api/siteApi'
 
 export function CompanyMapPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const companyId = Number(id)
 
-  const [company, setCompany] = useState<CompanyDto | null>(null)
+  const [company, setCompany] = useState<Company | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
-  const [sites, setSites] = useState<SiteDto[]>([])
+  const [sites, setSites] = useState<{ id: number; code: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
@@ -46,9 +24,9 @@ export function CompanyMapPage() {
     setError('')
 
     Promise.all([
-      api.get<CompanyDto>(`/master/companies/${companyId}`),
-      api.get<LayoutImageDto>(`/master/companies/${companyId}/image`).catch(() => null),
-      api.get<SiteDto[]>(`/master/sites?companyId=${companyId}`),
+      getCompany(companyId),
+      getCompanyImage(companyId).catch(() => null),
+      listSites(companyId),
     ])
       .then(([companyData, imgData, sitesData]) => {
         if (!active) return
@@ -87,16 +65,12 @@ export function CompanyMapPage() {
   }, [sites])
 
   async function handleImageUpload(base64: string, width: number, height: number) {
-    await api.put<LayoutImageDto>(`/master/companies/${companyId}/image`, {
-      imageBase64: base64,
-      width,
-      height,
-    })
+    await putCompanyImage(companyId, { imageBase64: base64, width, height })
     setImage({ base64, width, height })
   }
 
   async function handleImageDelete() {
-    await api.delete(`/master/companies/${companyId}/image`)
+    await deleteCompanyImage(companyId)
     setImage(null)
   }
 

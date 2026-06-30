@@ -1,43 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
-import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
-
-interface SiteDto {
-  id: number
-  companyId: number
-  code: string
-  name: string
-  address: string | null
-  createdAt: string
-}
-
-interface LayoutImageDto {
-  id: number
-  imageBase64: string | null
-  width: number | null
-  height: number | null
-}
-
-interface FactoryDto {
-  id: number
-  siteId: number
-  code: string
-  name: string
-  description: string | null
-  hasImage: boolean
-  createdAt: string
-  updatedAt: string
-}
+import { LayoutMap, type MapPin } from '@/widgets/layout-map'
+import { getSite, getSiteImage, putSiteImage, deleteSiteImage } from '@/entities/site/api/siteApi'
+import type { Site } from '@/entities/site/model/types'
+import { listFactories } from '@/entities/factory/api/factoryApi'
 
 export function SiteMapPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const siteId = Number(id)
 
-  const [site, setSite] = useState<SiteDto | null>(null)
+  const [site, setSite] = useState<Site | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
-  const [factories, setFactories] = useState<FactoryDto[]>([])
+  const [factories, setFactories] = useState<{ id: number; code: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
@@ -49,9 +24,9 @@ export function SiteMapPage() {
     setError('')
 
     Promise.all([
-      api.get<SiteDto>(`/master/sites/${siteId}`),
-      api.get<LayoutImageDto>(`/master/sites/${siteId}/image`).catch(() => null),
-      api.get<FactoryDto[]>(`/master/factories?siteId=${siteId}`),
+      getSite(siteId),
+      getSiteImage(siteId).catch(() => null),
+      listFactories(siteId),
     ])
       .then(([siteData, imgData, factoriesData]) => {
         if (!active) return
@@ -90,16 +65,12 @@ export function SiteMapPage() {
   }, [factories])
 
   async function handleImageUpload(base64: string, width: number, height: number) {
-    await api.put<LayoutImageDto>(`/master/sites/${siteId}/image`, {
-      imageBase64: base64,
-      width,
-      height,
-    })
+    await putSiteImage(siteId, { imageBase64: base64, width, height })
     setImage({ base64, width, height })
   }
 
   async function handleImageDelete() {
-    await api.delete(`/master/sites/${siteId}/image`)
+    await deleteSiteImage(siteId)
     setImage(null)
   }
 

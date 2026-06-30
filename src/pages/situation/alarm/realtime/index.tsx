@@ -1,8 +1,8 @@
 import { AlarmLayout } from '../AlarmLayout'
-import { AlarmListPanel } from '../components/AlarmListPanel'
-import { AlarmMapPanel } from '../components/AlarmMapPanel'
-import { AlarmDetailPanel } from '../components/AlarmDetailPanel'
-import { useAlarmFeed } from '../useAlarmFeed'
+import { AlarmListPanel } from '../ui/AlarmListPanel'
+import { AlarmMapPanel } from '../ui/AlarmMapPanel'
+import { AlarmDetailPanel } from '../ui/AlarmDetailPanel'
+import { useAlarmFeed } from '@/features/alarm-feed/model/useAlarmFeed'
 
 export function AlarmRealtimePage() {
   const {

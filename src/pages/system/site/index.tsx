@@ -1,35 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
+import { listCompanies } from '@/entities/company/api/companyApi'
+import { listSites, createSite, updateSite, deleteSite } from '@/entities/site/api/siteApi'
+import type { Site } from '@/entities/site/model/types'
 
 interface Company { id: number; name: string }
-interface Site {
-  id: number
+interface SiteRow extends Site {
   company?: Company
-  companyId?: number
   companyName?: string
-  code: string
-  name: string
-  description?: string
 }
 
 const EMPTY: Record<string, string> = { companyId: '', code: '', name: '', description: '' }
 
 export function SitePage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<Site[]>([])
+  const [rows, setRows] = useState<SiteRow[]>([])
   const [loading, setLoading] = useState(true)
   const [companies, setCompanies] = useState<Company[]>([])
   const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Site | null>(null)
+  const [editTarget, setEditTarget] = useState<SiteRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<Site[]>([])
+  const [deleteTargets, setDeleteTargets] = useState<SiteRow[]>([])
 
   const columns: Column[] = [
     {
@@ -69,13 +66,13 @@ export function SitePage() {
 
   useEffect(() => {
     loadRows()
-    api.get<Company[]>('/master/companies').then(setCompanies).catch(() => setCompanies([]))
+    listCompanies().then(setCompanies).catch(() => setCompanies([]))
   }, [])
 
   async function loadRows() {
     setLoading(true)
     try {
-      setRows(await api.get<Site[]>('/master/sites'))
+      setRows(await listSites())
     } catch {
       setRows([])
     } finally {
@@ -90,7 +87,7 @@ export function SitePage() {
   }
 
   function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as Site
+    const r = row as unknown as SiteRow
     setEditTarget(r)
     setFormValues({
       companyId: String(r.company?.id ?? r.companyId ?? ''),
@@ -104,9 +101,9 @@ export function SitePage() {
   async function handleSubmit() {
     const body = { companyId: Number(formValues.companyId), code: formValues.code, name: formValues.name, description: formValues.description }
     if (editTarget) {
-      await api.put(`/master/sites/${editTarget.id}`, body)
+      await updateSite(editTarget.id, body)
     } else {
-      await api.post('/master/sites', body)
+      await createSite(body)
     }
     setFormOpen(false)
     loadRows()
@@ -114,7 +111,7 @@ export function SitePage() {
 
   async function handleDelete() {
     for (const t of deleteTargets) {
-      await api.delete(`/master/sites/${t.id}`)
+      await deleteSite(t.id)
     }
     setDeleteTargets([])
     loadRows()
@@ -135,7 +132,7 @@ export function SitePage() {
         loading={loading}
         onAdd={openCreate}
         onEdit={openEdit}
-        onDelete={(selected) => setDeleteTargets(selected as unknown as Site[])}
+        onDelete={(selected) => setDeleteTargets(selected as unknown as SiteRow[])}
         searchPlaceholder="사업장 검색"
       />
       {formOpen && (

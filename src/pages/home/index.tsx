@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/shared/lib/api'
-import { useAuthStore } from '@/shared/store/auth'
+import { useAuthStore } from '@/entities/user/model/authStore'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
-import { WidgetGrid } from '@/shared/ui/widgets/WidgetGrid'
-import { AddWidgetModal } from '@/shared/ui/widgets/AddWidgetModal'
-import type { DashboardLayout, Widget } from '@/shared/ui/widgets/types'
+import { WidgetGrid } from '@/widgets/dashboard-grid/ui/WidgetGrid'
+import { AddWidgetModal } from '@/features/widget-personalize/ui/AddWidgetModal'
+import type { DashboardLayout, Widget } from '@/entities/widget/model/types'
 
 interface UserDashboard {
   userId: number

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { api } from '@/shared/lib/api'
 import { PointTrendLayout } from '../PointTrendLayout'
-import { AddSeriesModal } from '../../AddSeriesModal'
-import { calcStats, generateInsights, type SeriesStats, type Insight } from '../../insights'
-import { StatsMatrix } from '../../StatsMatrix'
-import { InsightCards } from '../../InsightCards'
-import { METRIC_LABELS, type Series, type EquipmentLive } from '../../types'
+import { AddSeriesModal } from '../ui/AddSeriesModal'
+import { calcStats, generateInsights, type SeriesStats, type Insight } from '@/entities/series/lib/insights'
+import { StatsMatrix } from '../ui/StatsMatrix'
+import { InsightCards } from '../ui/InsightCards'
+import { METRIC_LABELS, type Series, type EquipmentLive } from '@/entities/series/model/types'
 
 interface TrendPoint {
   ts: string

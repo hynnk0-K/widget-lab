@@ -1,25 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
+import { listProcesses } from '@/entities/process/api/processApi'
+import { listLines, createLine, updateLine, deleteLine } from '@/entities/line/api/lineApi'
+import type { Line } from '@/entities/line/model/types'
 
 interface Process {
   id: number
   name: string
 }
-interface Line {
-  id: number
+interface LineRow extends Line {
   process?: Process
-  processId?: number
   processName?: string
-  code: string
-  name: string
-  description?: string
 }
 
 const EMPTY: Record<string, string> = { processId: '', code: '', name: '', description: '' }
@@ -27,13 +24,13 @@ const EMPTY: Record<string, string> = { processId: '', code: '', name: '', descr
 export function LinePage() {
   const navigate = useNavigate()
 
-  const [rows, setRows] = useState<Line[]>([])
+  const [rows, setRows] = useState<LineRow[]>([])
   const [loading, setLoading] = useState(true)
   const [processes, setProcesses] = useState<Process[]>([])
   const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Line | null>(null)
+  const [editTarget, setEditTarget] = useState<LineRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<Line[]>([])
+  const [deleteTargets, setDeleteTargets] = useState<LineRow[]>([])
 
   const columns: Column[] = [
     {
@@ -79,16 +76,13 @@ export function LinePage() {
 
   useEffect(() => {
     loadRows()
-    api
-      .get<Process[]>('/master/processes')
-      .then(setProcesses)
-      .catch(() => setProcesses([]))
+    listProcesses().then(setProcesses).catch(() => setProcesses([]))
   }, [])
 
   async function loadRows() {
     setLoading(true)
     try {
-      setRows(await api.get<Line[]>('/master/lines'))
+      setRows(await listLines())
     } catch {
       setRows([])
     } finally {
@@ -103,7 +97,7 @@ export function LinePage() {
   }
 
   function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as Line
+    const r = row as unknown as LineRow
     setEditTarget(r)
     setFormValues({
       processId: String(r.process?.id ?? r.processId ?? ''),
@@ -122,9 +116,9 @@ export function LinePage() {
       description: formValues.description,
     }
     if (editTarget) {
-      await api.put(`/master/lines/${editTarget.id}`, body)
+      await updateLine(editTarget.id, body)
     } else {
-      await api.post('/master/lines', body)
+      await createLine(body)
     }
     setFormOpen(false)
     loadRows()
@@ -132,7 +126,7 @@ export function LinePage() {
 
   async function handleDelete() {
     for (const t of deleteTargets) {
-      await api.delete(`/master/lines/${t.id}`)
+      await deleteLine(t.id)
     }
     setDeleteTargets([])
     loadRows()
@@ -159,7 +153,7 @@ export function LinePage() {
         loading={loading}
         onAdd={openCreate}
         onEdit={openEdit}
-        onDelete={(selected) => setDeleteTargets(selected as unknown as Line[])}
+        onDelete={(selected) => setDeleteTargets(selected as unknown as LineRow[])}
         searchPlaceholder="라인 검색"
       />
       {formOpen && (

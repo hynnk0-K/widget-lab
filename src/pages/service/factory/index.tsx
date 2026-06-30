@@ -1,38 +1,35 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
+import { listSites } from '@/entities/site/api/siteApi'
+import { listFactories, createFactory, updateFactory, deleteFactory } from '@/entities/factory/api/factoryApi'
+import type { Factory } from '@/entities/factory/model/types'
 
 interface Site {
   id: number
   name: string
 }
-interface Factory {
-  id: number
+interface FactoryRow extends Factory {
   site?: Site
-  siteId?: number
   siteName?: string
-  code: string
-  name: string
-  description?: string
 }
 
 const EMPTY: Record<string, string> = { siteId: '', code: '', name: '', description: '' }
 
 export function FactoryPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<Factory[]>([])
+  const [rows, setRows] = useState<FactoryRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sites, setSites] = useState<Site[]>([])
   const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Factory | null>(null)
+  const [editTarget, setEditTarget] = useState<FactoryRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<Factory[]>([])
+  const [deleteTargets, setDeleteTargets] = useState<FactoryRow[]>([])
 
   const columns: Column[] = [
     {
@@ -72,16 +69,13 @@ export function FactoryPage() {
 
   useEffect(() => {
     loadRows()
-    api
-      .get<Site[]>('/master/sites')
-      .then(setSites)
-      .catch(() => setSites([]))
+    listSites().then(setSites).catch(() => setSites([]))
   }, [])
 
   async function loadRows() {
     setLoading(true)
     try {
-      setRows(await api.get<Factory[]>('/master/factories'))
+      setRows(await listFactories())
     } catch {
       setRows([])
     } finally {
@@ -96,7 +90,7 @@ export function FactoryPage() {
   }
 
   function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as Factory
+    const r = row as unknown as FactoryRow
     setEditTarget(r)
     setFormValues({
       siteId: String(r.site?.id ?? r.siteId ?? ''),
@@ -115,9 +109,9 @@ export function FactoryPage() {
       description: formValues.description,
     }
     if (editTarget) {
-      await api.put(`/master/factories/${editTarget.id}`, body)
+      await updateFactory(editTarget.id, body)
     } else {
-      await api.post('/master/factories', body)
+      await createFactory(body)
     }
     setFormOpen(false)
     loadRows()
@@ -125,7 +119,7 @@ export function FactoryPage() {
 
   async function handleDelete() {
     for (const t of deleteTargets) {
-      await api.delete(`/master/factories/${t.id}`)
+      await deleteFactory(t.id)
     }
     setDeleteTargets([])
     loadRows()
@@ -152,7 +146,7 @@ export function FactoryPage() {
         loading={loading}
         onAdd={openCreate}
         onEdit={openEdit}
-        onDelete={(selected) => setDeleteTargets(selected as unknown as Factory[])}
+        onDelete={(selected) => setDeleteTargets(selected as unknown as FactoryRow[])}
         searchPlaceholder="공장 검색"
       />
       {formOpen && (

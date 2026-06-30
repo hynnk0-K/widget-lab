@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api } from '@/shared/lib/api'
 import { parsePosition } from '@/shared/lib/parsePosition'
-import { LayoutMap, type MapPin } from '@/shared/ui/layout-map'
-import { DiagramMap } from '@/shared/ui/diagram-map'
+import { LayoutMap, type MapPin } from '@/widgets/layout-map'
+import { DiagramMap } from '@/widgets/diagram-map'
 import {
   loadMapMode,
   saveMapMode,
@@ -12,51 +11,19 @@ import {
   type MapMode,
   type DiagramData,
 } from '@/shared/lib/diagramStorage'
-
-interface ProcessDto {
-  id: number
-  factoryId: number
-  code: string
-  name: string
-  description: string | null
-  position: string | null
-  imageWidth: number | null
-  imageHeight: number | null
-  hasImage: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-interface LayoutImageDto {
-  id: number
-  imageBase64: string | null
-  width: number | null
-  height: number | null
-}
-
-interface LineDto {
-  id: number
-  processId: number
-  code: string
-  name: string
-  description: string | null
-  position: string | null
-  imageWidth: number | null
-  imageHeight: number | null
-  hasImage: boolean
-  createdAt: string
-  updatedAt: string
-}
-
+import { getProcess, getProcessImage, putProcessImage, deleteProcessImage } from '@/entities/process/api/processApi'
+import type { Process } from '@/entities/process/model/types'
+import { listLines, updateLine } from '@/entities/line/api/lineApi'
+import type { Line } from '@/entities/line/model/types'
 
 export function ProcessMapPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const processId = Number(id)
 
-  const [process, setProcess] = useState<ProcessDto | null>(null)
+  const [process, setProcess] = useState<Process | null>(null)
   const [image, setImage] = useState<{ base64: string; width: number; height: number } | null>(null)
-  const [lines, setLines] = useState<LineDto[]>([])
+  const [lines, setLines] = useState<Line[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
@@ -73,9 +40,9 @@ export function ProcessMapPage() {
     setError('')
 
     Promise.all([
-      api.get<ProcessDto>(`/master/processes/${processId}`),
-      api.get<LayoutImageDto>(`/master/processes/${processId}/image`).catch(() => null),
-      api.get<LineDto[]>(`/master/lines?processId=${processId}`),
+      getProcess(processId),
+      getProcessImage(processId).catch(() => null),
+      listLines(processId),
       loadDiagram('process', processId),
     ])
       .then(([processData, imgData, linesData, diagramData]) => {
@@ -140,16 +107,12 @@ export function ProcessMapPage() {
   }
 
   async function handleImageUpload(base64: string, width: number, height: number) {
-    await api.put<LayoutImageDto>(`/master/processes/${processId}/image`, {
-      imageBase64: base64,
-      width,
-      height,
-    })
+    await putProcessImage(processId, { imageBase64: base64, width, height })
     setImage({ base64, width, height })
   }
 
   async function handleImageDelete() {
-    await api.delete(`/master/processes/${processId}/image`)
+    await deleteProcessImage(processId)
     setImage(null)
   }
 
@@ -157,11 +120,11 @@ export function ProcessMapPage() {
     const target = lines.find((l) => l.id === pinId)
     if (!target) return
     const positionJson = JSON.stringify({ x, y, ...(width && height ? { w: width, h: height } : {}) })
-    await api.put<LineDto>(`/master/lines/${pinId}`, {
+    await updateLine(Number(pinId), {
       processId: target.processId,
       code: target.code,
       name: target.name,
-      description: target.description,
+      description: target.description ?? '',
       position: positionJson,
       imageWidth: target.imageWidth,
       imageHeight: target.imageHeight,
