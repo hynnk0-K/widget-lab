@@ -11,7 +11,12 @@ import {
   type MapMode,
   type DiagramData,
 } from '@/shared/lib/diagramStorage'
-import { getProcess, getProcessImage, putProcessImage, deleteProcessImage } from '@/entities/process/api/processApi'
+import {
+  getProcess,
+  getProcessImage,
+  putProcessImage,
+  deleteProcessImage,
+} from '@/entities/process/api/processApi'
 import type { Process } from '@/entities/process/model/types'
 import { listLines, updateLine } from '@/entities/line/api/lineApi'
 import type { Line } from '@/entities/line/model/types'
@@ -91,7 +96,10 @@ export function ProcessMapPage() {
         code: l.code,
         name: l.name,
         position: parsed ? { x: parsed.x, y: parsed.y } : null,
-        size: parsed?.width && parsed?.height ? { width: parsed.width, height: parsed.height } : undefined,
+        size:
+          parsed?.width && parsed?.height
+            ? { width: parsed.width, height: parsed.height }
+            : undefined,
         live: { hasData: false },
       }
     })
@@ -116,10 +124,20 @@ export function ProcessMapPage() {
     setImage(null)
   }
 
-  async function savePosition(pinId: number | string, x: number, y: number, width?: number, height?: number) {
+  async function savePosition(
+    pinId: number | string,
+    x: number,
+    y: number,
+    width?: number,
+    height?: number,
+  ) {
     const target = lines.find((l) => l.id === pinId)
     if (!target) return
-    const positionJson = JSON.stringify({ x, y, ...(width && height ? { w: width, h: height } : {}) })
+    const positionJson = JSON.stringify({
+      x,
+      y,
+      ...(width && height ? { w: width, h: height } : {}),
+    })
     await updateLine(Number(pinId), {
       processId: target.processId,
       code: target.code,
@@ -198,7 +216,9 @@ export function ProcessMapPage() {
                 saveMapMode('process', processId, 'image')
               }}
               className={`h-8 px-3 transition-colors ${
-                mode === 'image' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                mode === 'image'
+                  ? 'bg-[#003087] text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
               이미지
@@ -209,7 +229,9 @@ export function ProcessMapPage() {
                 saveMapMode('process', processId, 'diagram')
               }}
               className={`h-8 px-3 transition-colors border-l border-slate-200 ${
-                mode === 'diagram' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                mode === 'diagram'
+                  ? 'bg-[#003087] text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
               다이어그램

@@ -1,11 +1,43 @@
-import type { Edge, Node } from '@xyflow/react'
 import { api } from '@/shared/lib/api'
 
-export interface DiagramData {
-  nodes: Node[]
-  edges: Edge[]
+// ── P&ID 심볼 타입 ────────────────────────────────────────────────
+export type PidSymbolType =
+  | 'valve_gate'
+  | 'valve_globe'
+  | 'valve_check'
+  | 'valve_ball'
+  | 'instrument'
+  | 'tank'
+  | 'pump'
+  | 'motor'
+  | 'generic'
+
+export interface DiagramNode {
+  id: string
+  type: PidSymbolType
+  x: number
+  y: number
+  rotation?: number
+  label?: string       // instrument: 버블 안 태그(LT, LC), 그 외: 아래 레이블
+  deviceCode?: string
+  width?: number       // 사용자 지정 너비 (없으면 심볼 기본 크기)
+  height?: number      // 사용자 지정 높이
+  imageBase64?: string // 설정 시 심볼 대신 이미지 렌더
 }
 
+export interface DiagramEdge {
+  id: string
+  fromId: string
+  toId: string
+  edgeType: 'pipe' | 'signal'
+}
+
+export interface DiagramData {
+  nodes: DiagramNode[]
+  edges: DiagramEdge[]
+}
+
+// ── 저장 모드 ─────────────────────────────────────────────────────
 export type MapMode = 'image' | 'diagram'
 
 const SCOPE_PATH: Record<'process' | 'line', string> = {
@@ -22,7 +54,6 @@ export function saveMapMode(scope: 'process' | 'line', id: number, mode: MapMode
   localStorage.setItem(`map-mode:${scope}:${id}`, mode)
 }
 
-// 다이어그램 위에 업로드 이미지를 배경으로 깔지 여부 (이미지/다이어그램 양자택일이 아니라 둘을 같이 쓰는 경우용)
 export function loadBgVisible(scope: 'process' | 'line', id: number): boolean {
   return localStorage.getItem(`map-bg:${scope}:${id}`) !== 'off'
 }
@@ -31,12 +62,53 @@ export function saveBgVisible(scope: 'process' | 'line', id: number, visible: bo
   localStorage.setItem(`map-bg:${scope}:${id}`, visible ? 'on' : 'off')
 }
 
+// ── API ───────────────────────────────────────────────────────────
+// 이전 React Flow 형식(nodes[].position 객체)을 새 형식으로 마이그레이션
+function migrate(raw: Record<string, unknown>): DiagramData {
+  const rawNodes = (raw.nodes ?? []) as Array<Record<string, unknown>>
+  if (!rawNodes.length) return { nodes: [], edges: [] }
+
+  // React Flow 형식 감지
+  if (rawNodes[0]?.position && typeof rawNodes[0].position === 'object') {
+    const typeMap: Record<string, PidSymbolType> = {
+      pump: 'pump', valve: 'valve_gate', tank: 'tank',
+      sensor: 'instrument', compressor: 'generic', motor: 'motor',
+      filter: 'generic', heater: 'generic', generic: 'generic',
+    }
+    const nodes: DiagramNode[] = rawNodes.map((n) => {
+      const pos = n.position as { x: number; y: number }
+      const data = (n.data ?? {}) as Record<string, unknown>
+      return {
+        id: String(n.id),
+        type: typeMap[String(data.icon ?? 'generic')] ?? 'generic',
+        x: pos.x + 20,
+        y: pos.y + 20,
+        label: data.label ? String(data.label) : undefined,
+        deviceCode: data.deviceCode ? String(data.deviceCode) : undefined,
+      }
+    })
+    const rawEdges = (raw.edges ?? []) as Array<Record<string, unknown>>
+    const edges: DiagramEdge[] = rawEdges.map((e) => ({
+      id: String(e.id),
+      fromId: String(e.source),
+      toId: String(e.target),
+      edgeType: 'pipe',
+    }))
+    return { nodes, edges }
+  }
+
+  return {
+    nodes: rawNodes as unknown as DiagramNode[],
+    edges: ((raw.edges ?? []) as unknown[]) as DiagramEdge[],
+  }
+}
+
 export async function loadDiagram(scope: 'process' | 'line', id: number): Promise<DiagramData> {
   try {
-    const data = await api.get<Partial<DiagramData>>(`${SCOPE_PATH[scope]}/${id}/diagram`)
-    return { nodes: data.nodes ?? [], edges: data.edges ?? [] }
+    const data = await api.get<Record<string, unknown>>(`${SCOPE_PATH[scope]}/${id}/diagram`)
+    return migrate(data)
   } catch {
-    return { nodes: [], edges: [] } // 저장된 도면 없음 (404)
+    return { nodes: [], edges: [] }
   }
 }
 

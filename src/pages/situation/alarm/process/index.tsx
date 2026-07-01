@@ -44,7 +44,11 @@ export function AlarmProcessPage() {
     <AlarmLayout>
       <div className="flex flex-col gap-3 p-5 h-full">
         <div className="grid grid-cols-[400px_1fr] gap-3 flex-1 min-h-0">
-          <AlarmListPanel alarms={filteredAlarms} selectedId={selectedId} onSelect={setSelectedId} />
+          <AlarmListPanel
+            alarms={filteredAlarms}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
           <AlarmMapPanel
             alarms={filteredAlarms}
             selectedAlarmId={selectedId}
