@@ -99,7 +99,10 @@ export function RealtimeWbgtPage() {
   }, [siteId, sites])
 
   const selectedSite = sites.find((s) => s.id === siteId) ?? null
-  const factories = useMemo(() => (selectedSite ? children(selectedSite, 'factory') : []), [selectedSite])
+  const factories = useMemo(
+    () => (selectedSite ? children(selectedSite, 'factory') : []),
+    [selectedSite],
+  )
 
   // 도면(공장/공정) 이미지 + 하위 노드 좌표 로드
   useEffect(() => {
@@ -110,7 +113,10 @@ export function RealtimeWbgtPage() {
     }
     const id = view.level === 'factory' ? view.factory.id : view.process.id
     const path = view.level === 'factory' ? 'factories' : 'processes'
-    const childPath = view.level === 'factory' ? `/master/processes?factoryId=${id}` : `/master/lines?processId=${id}`
+    const childPath =
+      view.level === 'factory'
+        ? `/master/processes?factoryId=${id}`
+        : `/master/lines?processId=${id}`
     setImageLoading(true)
     Promise.all([
       api.get<LayoutImageDto>(`/master/${path}/${id}/image`).catch(() => null),
@@ -186,7 +192,9 @@ export function RealtimeWbgtPage() {
       tooltip: { trigger: 'axis' as const },
       xAxis: {
         type: 'category' as const,
-        data: points.map((p) => new Date(p.ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })),
+        data: points.map((p) =>
+          new Date(p.ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        ),
         axisLine: { lineStyle: { color: '#cbd5e1' } },
         axisLabel: { color: '#94a3b8', fontSize: 10, interval: 4 },
       },
@@ -235,7 +243,11 @@ export function RealtimeWbgtPage() {
         <div className="flex items-center gap-1.5 text-[13px]">
           <button
             onClick={() => setView({ level: 'factories' })}
-            className={view.level === 'factories' ? 'font-semibold text-slate-800' : 'text-slate-400 hover:text-slate-600'}
+            className={
+              view.level === 'factories'
+                ? 'font-semibold text-slate-800'
+                : 'text-slate-400 hover:text-slate-600'
+            }
           >
             {selectedSite?.name ?? '사업장'}
           </button>
@@ -244,7 +256,11 @@ export function RealtimeWbgtPage() {
               <span className="text-slate-300">/</span>
               <button
                 onClick={() => setView({ level: 'factory', factory: view.factory })}
-                className={view.level === 'factory' ? 'font-semibold text-slate-800' : 'text-slate-400 hover:text-slate-600'}
+                className={
+                  view.level === 'factory'
+                    ? 'font-semibold text-slate-800'
+                    : 'text-slate-400 hover:text-slate-600'
+                }
               >
                 {view.factory.name}
               </button>
@@ -293,7 +309,9 @@ export function RealtimeWbgtPage() {
                     className="flex flex-col items-start gap-1 px-4 py-3 rounded-xl border border-slate-200 bg-white hover:shadow-md transition-shadow min-w-[160px]"
                   >
                     <span className="text-[13px] font-semibold text-slate-800">{f.name}</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full text-white ${WBGT_RISK_COLOR[risk]}`}>
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full text-white ${WBGT_RISK_COLOR[risk]}`}
+                    >
                       {WBGT_RISK_LABEL[risk]}
                     </span>
                   </button>
@@ -311,12 +329,19 @@ export function RealtimeWbgtPage() {
         ) : (
           <div className="flex-1 min-h-0 flex gap-3">
             <div className="flex-1 min-w-0">
-              <WbgtZoneMap image={image} pins={pins} onPinClick={handlePinClick} summary={processSummary} />
+              <WbgtZoneMap
+                image={image}
+                pins={pins}
+                onPinClick={handlePinClick}
+                summary={processSummary}
+              />
             </div>
             {selectedLine && (
               <div className="w-[300px] flex-shrink-0 bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-3 overflow-auto">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[14px] font-semibold text-slate-800 m-0">{selectedLine.name}</h3>
+                  <h3 className="text-[14px] font-semibold text-slate-800 m-0">
+                    {selectedLine.name}
+                  </h3>
                   <button
                     onClick={() => setSelectedLineId(null)}
                     className="text-slate-400 hover:text-slate-600 text-[12px]"
@@ -330,9 +355,13 @@ export function RealtimeWbgtPage() {
                   >
                     {getMockWbgt(selectedLine.id)}°C
                   </span>
-                  <span className="text-[12px] text-slate-500">{WBGT_RISK_LABEL[lineRisk(selectedLine)]}</span>
+                  <span className="text-[12px] text-slate-500">
+                    {WBGT_RISK_LABEL[lineRisk(selectedLine)]}
+                  </span>
                 </div>
-                {trendOption && <ReactECharts option={trendOption} style={{ height: 220 }} notMerge />}
+                {trendOption && (
+                  <ReactECharts option={trendOption} style={{ height: 220 }} notMerge />
+                )}
               </div>
             )}
           </div>
