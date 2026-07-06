@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
 import { RealtimeWbgtPage } from '@/pages/realtime/wbgt'
+import { EhsDetailPage } from '@/pages/realtime/ehs-detail'
 import { RealtimeGasPage } from '@/pages/realtime/gas'
 import { RealtimeMotionPage } from '@/pages/realtime/motion'
 import { RealtimeCitygasPage } from '@/pages/realtime/citygas'
@@ -65,6 +66,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/realtime/dashboard" replace />} />
                     <Route path="/realtime/dashboard" element={<HomePage />} />
+                    <Route path="/realtime/ehs-detail/:category" element={<EhsDetailPage />} />
                     <Route path="/realtime/wbgt" element={<RealtimeWbgtPage />} />
                     <Route path="/realtime/gas" element={<RealtimeGasPage />} />
                     <Route path="/realtime/motion" element={<RealtimeMotionPage />} />
