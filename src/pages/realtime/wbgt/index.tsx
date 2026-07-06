@@ -4,6 +4,8 @@ import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { api } from '@/shared/lib/api'
 import { parsePosition } from '@/shared/lib/parsePosition'
 import { WbgtZoneMap, type WbgtZonePin, type WbgtZoneSummary } from './WbgtZoneMap'
+import { DiagramMap } from '@/widgets/diagram-map'
+import { loadDiagram, type DiagramData } from '@/shared/lib/diagramStorage'
 import {
   WBGT_RISK_COLOR,
   WBGT_RISK_LABEL,
@@ -71,6 +73,7 @@ export function RealtimeWbgtPage() {
   const [imageLoading, setImageLoading] = useState(false)
   const [positions, setPositions] = useState<Record<number, { x: number; y: number } | null>>({})
   const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
+  const [currentDiagram, setCurrentDiagram] = useState<DiagramData | null>(null)
   const [tick, setTick] = useState(0)
 
   // 화면 전환(드릴다운/브레드크럼) 시 이전 선택은 해제
@@ -104,11 +107,12 @@ export function RealtimeWbgtPage() {
     [selectedSite],
   )
 
-  // 도면(공장/공정) 이미지 + 하위 노드 좌표 로드
+  // 도면(공장/공정) 이미지 + 하위 노드 좌표 + 공정 다이어그램 로드
   useEffect(() => {
     if (view.level === 'factories') {
       setImage(null)
       setPositions({})
+      setCurrentDiagram(null)
       return
     }
     const id = view.level === 'factory' ? view.factory.id : view.process.id
@@ -118,11 +122,18 @@ export function RealtimeWbgtPage() {
         ? `/master/processes?factoryId=${id}`
         : `/master/lines?processId=${id}`
     setImageLoading(true)
+    const diagramPromise =
+      view.level === 'process'
+        ? loadDiagram('process', id)
+        : view.level === 'factory'
+          ? loadDiagram('factory', id)
+          : Promise.resolve(null)
     Promise.all([
       api.get<LayoutImageDto>(`/master/${path}/${id}/image`).catch(() => null),
       api.get<PositionedDto[]>(childPath).catch(() => []),
+      diagramPromise,
     ])
-      .then(([data, childList]) => {
+      .then(([data, childList, diagram]) => {
         if (data?.imageBase64 && data.width && data.height) {
           setImage({ base64: data.imageBase64, width: data.width, height: data.height })
         } else {
@@ -131,6 +142,7 @@ export function RealtimeWbgtPage() {
         const map: Record<number, { x: number; y: number } | null> = {}
         for (const c of childList) map[c.id] = parsePosition(c.position)
         setPositions(map)
+        setCurrentDiagram(diagram)
       })
       .finally(() => setImageLoading(false))
   }, [view])
@@ -216,6 +228,47 @@ export function RealtimeWbgtPage() {
       ],
     }
   }, [selectedLine, tick])
+
+  // 현재 레벨 다이어그램의 zone 노드 → WBGT 값 맵 (linkedId → { value, risk, riskLabel })
+  const zoneValueMap = useMemo(() => {
+    void tick
+    if (!currentDiagram) return undefined
+    // factory 레벨: zone이 공정 ID에 링크됨
+    if (view.level === 'factory') {
+      const procs = children(view.factory, 'process')
+      const result: Record<number, { value: number; risk: string; riskLabel: string }> = {}
+      for (const node of currentDiagram.nodes) {
+        if (node.type !== 'zone' || node.linkedId == null) continue
+        const proc = procs.find((p) => p.id === node.linkedId)
+        if (!proc) continue
+        const value = getMockWbgt(proc.id)
+        const risk = nodeWorstRisk(proc)
+        result[node.linkedId] = { value, risk, riskLabel: WBGT_RISK_LABEL[risk] }
+      }
+      return Object.keys(result).length > 0 ? result : undefined
+    }
+    // process 레벨: zone이 라인 ID에 링크됨
+    if (view.level === 'process') {
+      const lines = children(view.process, 'line')
+      const result: Record<number, { value: number; risk: string; riskLabel: string }> = {}
+      for (const node of currentDiagram.nodes) {
+        if (node.type !== 'zone' || node.linkedId == null) continue
+        const line = lines.find((l) => l.id === node.linkedId)
+        if (!line) continue
+        const value = getMockWbgt(line.id)
+        const risk = wbgtToRisk(value)
+        result[node.linkedId] = { value, risk, riskLabel: WBGT_RISK_LABEL[risk] }
+      }
+      return Object.keys(result).length > 0 ? result : undefined
+    }
+    return undefined
+  }, [view, tick, currentDiagram])
+
+  // zone 노드가 있으면 DiagramMap으로 표시 (factory/process 공통)
+  const hasZones =
+    currentDiagram != null &&
+    currentDiagram.nodes.some((n) => n.type === 'zone' && n.linkedId != null) &&
+    (view.level === 'factory' || view.level === 'process')
 
   function handlePinClick(id: number) {
     if (view.level === 'factory') {
@@ -329,12 +382,23 @@ export function RealtimeWbgtPage() {
         ) : (
           <div className="flex-1 min-h-0 flex gap-3">
             <div className="flex-1 min-w-0">
-              <WbgtZoneMap
-                image={image}
-                pins={pins}
-                onPinClick={handlePinClick}
-                summary={processSummary}
-              />
+              {hasZones ? (
+                <DiagramMap
+                  nodes={currentDiagram!.nodes}
+                  edges={currentDiagram!.edges}
+                  editMode={false}
+                  backgroundImage={image}
+                  zoneValueMap={zoneValueMap}
+                  onZoneClick={handlePinClick}
+                />
+              ) : (
+                <WbgtZoneMap
+                  image={image}
+                  pins={pins}
+                  onPinClick={handlePinClick}
+                  summary={processSummary}
+                />
+              )}
             </div>
             {selectedLine && (
               <div className="w-[300px] flex-shrink-0 bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-3 overflow-auto">

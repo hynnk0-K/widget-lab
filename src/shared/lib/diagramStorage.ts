@@ -11,6 +11,7 @@ export type PidSymbolType =
   | 'pump'
   | 'motor'
   | 'generic'
+  | 'zone'             // 구역 레이블 (WBGT 등 오버레이용)
 
 export interface DiagramNode {
   id: string
@@ -23,6 +24,7 @@ export interface DiagramNode {
   width?: number       // 사용자 지정 너비 (없으면 심볼 기본 크기)
   height?: number      // 사용자 지정 높이
   imageBase64?: string // 설정 시 심볼 대신 이미지 렌더
+  linkedId?: number    // zone 타입: 연결된 공정/라인 ID (WBGT 등 실시간 데이터 매핑용)
 }
 
 export interface DiagramEdge {
@@ -40,17 +42,18 @@ export interface DiagramData {
 // ── 저장 모드 ─────────────────────────────────────────────────────
 export type MapMode = 'image' | 'diagram'
 
-const SCOPE_PATH: Record<'process' | 'line', string> = {
+const SCOPE_PATH: Record<'factory' | 'process' | 'line', string> = {
+  factory: '/master/factories',
   process: '/master/processes',
   line: '/master/lines',
 }
 
-export function loadMapMode(scope: 'process' | 'line', id: number): MapMode {
+export function loadMapMode(scope: 'factory' | 'process' | 'line', id: number): MapMode {
   const v = localStorage.getItem(`map-mode:${scope}:${id}`)
   return v === 'diagram' ? 'diagram' : 'image'
 }
 
-export function saveMapMode(scope: 'process' | 'line', id: number, mode: MapMode) {
+export function saveMapMode(scope: 'factory' | 'process' | 'line', id: number, mode: MapMode) {
   localStorage.setItem(`map-mode:${scope}:${id}`, mode)
 }
 
@@ -103,7 +106,7 @@ function migrate(raw: Record<string, unknown>): DiagramData {
   }
 }
 
-export async function loadDiagram(scope: 'process' | 'line', id: number): Promise<DiagramData> {
+export async function loadDiagram(scope: 'factory' | 'process' | 'line', id: number): Promise<DiagramData> {
   try {
     const data = await api.get<Record<string, unknown>>(`${SCOPE_PATH[scope]}/${id}/diagram`)
     return migrate(data)
@@ -112,6 +115,6 @@ export async function loadDiagram(scope: 'process' | 'line', id: number): Promis
   }
 }
 
-export async function saveDiagram(scope: 'process' | 'line', id: number, data: DiagramData) {
+export async function saveDiagram(scope: 'factory' | 'process' | 'line', id: number, data: DiagramData) {
   await api.put(`${SCOPE_PATH[scope]}/${id}/diagram`, data)
 }

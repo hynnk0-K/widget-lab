@@ -18,12 +18,26 @@ export interface EquipmentOption {
   name: string
 }
 
+export interface ZoneOption {
+  id: number
+  name: string
+}
+
+export interface ZoneValue {
+  value: number
+  risk: string // 'safe' | 'caution' | 'warning' | 'danger'
+  riskLabel: string
+}
+
 interface Props {
   nodes: DiagramNode[]
   edges: DiagramEdge[]
   editMode?: boolean
   onChange?: (nodes: DiagramNode[], edges: DiagramEdge[]) => void
   equipmentOptions?: EquipmentOption[]
+  zoneOptions?: ZoneOption[] // 영역 노드 링크 대상 (라인/공정 목록)
+  zoneValueMap?: Record<number, ZoneValue> // linkedId → 실시간 값 (WBGT 등)
+  onZoneClick?: (linkedId: number) => void // 뷰 모드에서 영역 클릭 (드릴다운)
   alarmStatusByDevice?: Record<string, 'critical' | 'warning'>
   selectedDeviceCode?: string | null
   backgroundImage?: { base64: string; width: number; height: number } | null
@@ -40,17 +54,27 @@ const SYMBOL_LABELS: Record<PidSymbolType, string> = {
   pump: '펌프',
   motor: '모터',
   generic: '일반 장비',
+  zone: '영역',
 }
 
 const SYMBOL_CATEGORIES: { label: string; types: PidSymbolType[] }[] = [
+  { label: '영역', types: ['zone'] },
   { label: '밸브', types: ['valve_gate', 'valve_globe', 'valve_check', 'valve_ball'] },
   { label: '계기', types: ['instrument'] },
   { label: '장비', types: ['tank', 'pump', 'motor', 'generic'] },
 ]
 
+const ZONE_RISK_HEX: Record<string, string> = {
+  safe: '#22c55e',
+  caution: '#eab308',
+  warning: '#f97316',
+  danger: '#ef4444',
+}
+
 export function getDefaultDims(type: PidSymbolType): { w: number; h: number } {
   if (type === 'tank') return { w: 28, h: 60 }
   if (type === 'generic') return { w: 68, h: 36 }
+  if (type === 'zone') return { w: 160, h: 100 }
   return { w: 40, h: 40 }
 }
 
@@ -60,6 +84,25 @@ function SymbolSvg({ type }: { type: PidSymbolType }) {
   const sw = 1.5
 
   switch (type) {
+    case 'zone':
+      return (
+        <svg width={40} height={28} viewBox="0 0 40 28">
+          <rect
+            x={1}
+            y={1}
+            width={38}
+            height={26}
+            rx={4}
+            fill="none"
+            stroke={c}
+            strokeWidth={sw}
+            strokeDasharray="4,2.5"
+          />
+          <text x={20} y={17} textAnchor="middle" fontSize={9} fontWeight="bold" fill={c}>
+            영역
+          </text>
+        </svg>
+      )
     case 'valve_gate':
       return (
         <svg width={32} height={32} viewBox="0 0 32 32">
@@ -131,7 +174,7 @@ function SymbolSvg({ type }: { type: PidSymbolType }) {
   }
 }
 
-// ── Konva 심볼 렌더 ───────────────────────────────────────────────
+// ── Konva P&ID 심볼 ───────────────────────────────────────────────
 function Symbol({
   type,
   w,
@@ -323,6 +366,7 @@ interface EditState {
   label: string
   deviceCode: string
   imageBase64: string
+  linkedId: number | null
 }
 
 let _id = 1
@@ -333,6 +377,9 @@ export function DiagramMap({
   editMode = false,
   onChange,
   equipmentOptions,
+  zoneOptions,
+  zoneValueMap,
+  onZoneClick,
   alarmStatusByDevice,
   selectedDeviceCode,
   backgroundImage,
@@ -396,7 +443,6 @@ export function DiagramMap({
     return () => ro.disconnect()
   }, [])
 
-  // 초기 뷰: 노드 있으면 fit-to-nodes, 없으면 원점 중앙
   useEffect(() => {
     if (autoFittedRef.current) return
     const el = containerRef.current
@@ -434,10 +480,9 @@ export function DiagramMap({
     c.width = cell
     c.height = cell
     const ctx = c.getContext('2d')!
-    // ctx.fillStyle = '#f8fafc00'
     ctx.fillStyle = '#f8fafc'
     ctx.fillRect(0, 0, cell, cell)
-    ctx.strokeStyle = '#e2e8f0aa'
+    ctx.strokeStyle = '#e2e8f0'
     ctx.lineWidth = 1
     ctx.beginPath()
     ctx.moveTo(cell - 0.5, 0)
@@ -495,7 +540,6 @@ export function DiagramMap({
     setStagePos({ x: w / 2 - cx * ns, y: h / 2 - cy * ns })
   }
 
-  // ── Stage 이벤트 ──
   function handleWheel(e: KonvaEventObject<WheelEvent>) {
     e.evt.preventDefault()
     const stage = e.target.getStage()!
@@ -523,7 +567,6 @@ export function DiagramMap({
     setMousePos({ x: pos.x, y: pos.y })
   }
 
-  // ── 노드 이벤트 ──
   function handleNodeClick(nodeId: string, e: KonvaEventObject<MouseEvent>) {
     e.cancelBubble = true
     if (tool === 'select' || !editMode) {
@@ -556,6 +599,7 @@ export function DiagramMap({
       label: node.label ?? '',
       deviceCode: node.deviceCode ?? '',
       imageBase64: node.imageBase64 ?? '',
+      linkedId: node.linkedId ?? null,
     })
   }
 
@@ -590,7 +634,6 @@ export function DiagramMap({
     setSelectedId(edgeId)
   }
 
-  // 팔레트에서 클릭 → 즉시 캔버스 중앙에 추가 (모달 없이)
   function quickAddNode(type: PidSymbolType) {
     const el = containerRef.current
     if (!el) return
@@ -610,11 +653,12 @@ export function DiagramMap({
 
   function handleSaveEdit() {
     if (!editing) return
-    const base = {
+    const base: Partial<DiagramNode> = {
       type: editing.type,
       label: editing.label || undefined,
-      deviceCode: editing.deviceCode || undefined,
+      deviceCode: editing.type !== 'zone' ? editing.deviceCode || undefined : undefined,
       imageBase64: editing.imageBase64 || undefined,
+      linkedId: editing.type === 'zone' ? (editing.linkedId ?? undefined) : undefined,
     }
     if (editing.id === null) {
       const el = containerRef.current
@@ -622,6 +666,7 @@ export function DiagramMap({
         h = el?.offsetHeight ?? stageSize.h
       const node: DiagramNode = {
         id: `n${_id++}`,
+        type: editing.type,
         x: (w / 2 - stagePos.x) / scale + (Math.random() - 0.5) * 60,
         y: (h / 2 - stagePos.y) / scale + (Math.random() - 0.5) * 60,
         ...base,
@@ -686,7 +731,9 @@ export function DiagramMap({
     return '#334155'
   }
 
-  // ── 렌더 ──────────────────────────────────────────────────────────
+  const zoneNodes = localNodes.filter((n) => n.type === 'zone')
+  const symbolNodes = localNodes.filter((n) => n.type !== 'zone')
+
   return (
     <div className="flex flex-col gap-2">
       {/* 툴바 */}
@@ -741,7 +788,6 @@ export function DiagramMap({
         </div>
       )}
 
-      {/* 캔버스 영역 */}
       <div
         className="flex rounded-xl border border-slate-200 overflow-hidden"
         style={{ height: 560 }}
@@ -826,6 +872,107 @@ export function DiagramMap({
                 />
               )}
 
+              {/* 영역 노드 — 심볼보다 먼저 그려서 뒤에 위치 */}
+              {zoneNodes.map((node) => {
+                const dims = nodeDims(node)
+                const isSel = selectedId === node.id
+                const zoneData = node.linkedId != null ? zoneValueMap?.[node.linkedId] : undefined
+                const zColor = zoneData ? (ZONE_RISK_HEX[zoneData.risk] ?? '#64748b') : '#64748b'
+
+                return (
+                  <Group
+                    key={node.id}
+                    x={node.x}
+                    y={node.y}
+                    offsetX={dims.w / 2}
+                    offsetY={dims.h / 2}
+                    draggable={editMode && tool === 'select'}
+                    onClick={(e) => {
+                      e.cancelBubble = true
+                      if (!editMode && node.linkedId != null) {
+                        onZoneClick?.(node.linkedId)
+                      } else if (editMode) {
+                        handleNodeClick(node.id, e)
+                      }
+                    }}
+                    onDblClick={(e) => handleNodeDblClick(node.id, e)}
+                    onDragEnd={(e) => handleNodeDragEnd(node.id, e.target.x(), e.target.y())}
+                  >
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={dims.w}
+                      height={dims.h}
+                      fill={zColor}
+                      opacity={zoneData ? 0.15 : 0.04}
+                      cornerRadius={6}
+                      listening={false}
+                    />
+                    <Rect
+                      x={0}
+                      y={0}
+                      width={dims.w}
+                      height={dims.h}
+                      stroke={isSel ? '#3b82f6' : zColor}
+                      strokeWidth={isSel ? 2 : 1.5}
+                      dash={[6, 3]}
+                      cornerRadius={6}
+                    />
+                    {node.label && (
+                      <Text
+                        x={4}
+                        y={8}
+                        width={dims.w - 8}
+                        align="center"
+                        text={node.label}
+                        fontSize={12}
+                        fontStyle="bold"
+                        fill={zColor}
+                        listening={false}
+                      />
+                    )}
+                    {zoneData && (
+                      <>
+                        <Text
+                          x={0}
+                          y={dims.h / 2 - 14}
+                          width={dims.w}
+                          align="center"
+                          text={`${zoneData.value}°C`}
+                          fontSize={22}
+                          fontStyle="bold"
+                          fill={zColor}
+                          listening={false}
+                        />
+                        <Text
+                          x={0}
+                          y={dims.h / 2 + 12}
+                          width={dims.w}
+                          align="center"
+                          text={zoneData.riskLabel}
+                          fontSize={10}
+                          fill={zColor}
+                          listening={false}
+                        />
+                      </>
+                    )}
+                    {isSel && editMode && tool === 'select' && (
+                      <Rect
+                        x={dims.w - 5}
+                        y={dims.h - 5}
+                        width={10}
+                        height={10}
+                        fill="#3b82f6"
+                        cornerRadius={2}
+                        draggable
+                        onDragMove={(e) => handleResizeDragMove(node.id, e)}
+                        onDragEnd={(e) => handleResizeDragEnd(node.id, e)}
+                      />
+                    )}
+                  </Group>
+                )
+              })}
+
               {localEdges.map((edge) => {
                 const from = nodesMap[edge.fromId],
                   to = nodesMap[edge.toId]
@@ -865,7 +1012,8 @@ export function DiagramMap({
                 />
               )}
 
-              {localNodes.map((node) => {
+              {/* 심볼 노드 */}
+              {symbolNodes.map((node) => {
                 const dims = nodeDims(node)
                 const color = nodeColor(node)
                 const isSel = selectedId === node.id
@@ -956,7 +1104,6 @@ export function DiagramMap({
             </Layer>
           </Stage>
 
-          {/* 우하단: 중앙 맞춤 + 줌 */}
           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
             <button
               onClick={fitView}
@@ -977,7 +1124,7 @@ export function DiagramMap({
         </div>
       </div>
 
-      {/* 속성 편집 모달 (더블클릭) */}
+      {/* 속성 편집 모달 */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
           <div className="bg-white rounded-xl border border-slate-200 shadow-lg p-4 w-[360px]">
@@ -985,89 +1132,120 @@ export function DiagramMap({
               {editing.id === null ? '심볼 추가' : '속성 편집'}
             </p>
 
-            {!editing.imageBase64 && (
+            {editing.type !== 'zone' && !editing.imageBase64 && (
               <div className="grid grid-cols-3 gap-1.5 mb-3">
-                {(Object.keys(SYMBOL_LABELS) as PidSymbolType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setEditing((s) => (s ? { ...s, type } : s))}
-                    className={`py-1.5 rounded-lg border text-[10px] transition-colors ${
-                      editing.type === type
-                        ? 'border-[#003087] bg-blue-50 text-[#003087]'
-                        : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    {SYMBOL_LABELS[type]}
-                  </button>
-                ))}
+                {(Object.keys(SYMBOL_LABELS) as PidSymbolType[])
+                  .filter((t) => t !== 'zone')
+                  .map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setEditing((s) => (s ? { ...s, type } : s))}
+                      className={`py-1.5 rounded-lg border text-[10px] transition-colors ${
+                        editing.type === type
+                          ? 'border-[#003087] bg-blue-50 text-[#003087]'
+                          : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      {SYMBOL_LABELS[type]}
+                    </button>
+                  ))}
               </div>
             )}
 
-            <div className="mb-3">
-              {editing.imageBase64 ? (
-                <div className="flex items-start gap-2">
-                  <img
-                    src={editing.imageBase64}
-                    alt=""
-                    className="h-16 w-16 object-contain rounded border border-slate-200 bg-slate-50"
-                  />
-                  <div className="flex flex-col gap-1.5">
-                    <label className="h-7 px-2.5 text-[11px] border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center">
-                      이미지 교체
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageFile}
-                        className="hidden"
-                      />
-                    </label>
-                    <button
-                      onClick={() => setEditing((s) => (s ? { ...s, imageBase64: '' } : s))}
-                      className="h-7 px-2.5 text-[11px] text-red-500 border border-red-200 rounded-lg hover:bg-red-50"
-                    >
-                      이미지 제거
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <label className="flex items-center gap-2 h-9 px-3 border border-dashed border-slate-300 rounded-lg text-[12px] text-slate-500 hover:bg-slate-50 cursor-pointer">
-                  <svg
-                    className="w-4 h-4 flex-shrink-0"
-                    fill="none"
-                    viewBox="0 0 16 16"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      d="M2 12l3-4 2 2.5L10 7l4 5H2z"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+            {editing.type !== 'zone' && (
+              <div className="mb-3">
+                {editing.imageBase64 ? (
+                  <div className="flex items-start gap-2">
+                    <img
+                      src={editing.imageBase64}
+                      alt=""
+                      className="h-16 w-16 object-contain rounded border border-slate-200 bg-slate-50"
                     />
-                    <rect x="1" y="1" width="14" height="14" rx="2" />
-                  </svg>
-                  이미지 선택 (선택 시 심볼 대신 표시)
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageFile}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="h-7 px-2.5 text-[11px] border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 cursor-pointer flex items-center">
+                        이미지 교체
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageFile}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        onClick={() => setEditing((s) => (s ? { ...s, imageBase64: '' } : s))}
+                        className="h-7 px-2.5 text-[11px] text-red-500 border border-red-200 rounded-lg hover:bg-red-50"
+                      >
+                        이미지 제거
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 h-9 px-3 border border-dashed border-slate-300 rounded-lg text-[12px] text-slate-500 hover:bg-slate-50 cursor-pointer">
+                    <svg
+                      className="w-4 h-4 flex-shrink-0"
+                      fill="none"
+                      viewBox="0 0 16 16"
+                      stroke="currentColor"
+                      strokeWidth={1.5}
+                    >
+                      <path
+                        d="M2 12l3-4 2 2.5L10 7l4 5H2z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <rect x="1" y="1" width="14" height="14" rx="2" />
+                    </svg>
+                    이미지 선택 (선택 시 심볼 대신 표시)
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFile}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+            )}
 
             <input
               autoFocus
               value={editing.label}
               onChange={(e) => setEditing((s) => (s ? { ...s, label: e.target.value } : s))}
-              placeholder={editing.type === 'instrument' ? '태그 (예: LT, LC-101)' : '이름'}
+              placeholder={
+                editing.type === 'zone'
+                  ? '영역 이름 (예: 가공공정, 유틸리티)'
+                  : editing.type === 'instrument'
+                    ? '태그 (예: LT, LC-101)'
+                    : '이름'
+              }
               className="w-full h-9 px-3 mb-3 text-[13px] border border-slate-200 rounded-lg outline-none focus:border-[#003087]"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSaveEdit()
               }}
             />
 
-            {equipmentOptions && equipmentOptions.length > 0 && (
+            {/* 영역 노드: 연결 라인/공정 선택 */}
+            {editing.type === 'zone' && zoneOptions && zoneOptions.length > 0 && (
+              <select
+                value={editing.linkedId ?? ''}
+                onChange={(e) =>
+                  setEditing((s) =>
+                    s ? { ...s, linkedId: e.target.value ? Number(e.target.value) : null } : s,
+                  )
+                }
+                className="w-full h-9 px-3 mb-3 text-[13px] border border-slate-200 rounded-lg outline-none focus:border-[#003087] bg-white"
+              >
+                <option value="">연결 대상 없음</option>
+                {zoneOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* 일반 심볼: 설비 연결 */}
+            {editing.type !== 'zone' && equipmentOptions && equipmentOptions.length > 0 && (
               <select
                 value={editing.deviceCode}
                 onChange={(e) => setEditing((s) => (s ? { ...s, deviceCode: e.target.value } : s))}

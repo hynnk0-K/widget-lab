@@ -1,7 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { parsePosition } from '@/shared/lib/parsePosition'
 import { LayoutMap, type MapPin } from '@/widgets/layout-map'
+import { DiagramMap } from '@/widgets/diagram-map'
+import {
+  loadMapMode,
+  saveMapMode,
+  loadDiagram,
+  saveDiagram,
+  type MapMode,
+  type DiagramData,
+} from '@/shared/lib/diagramStorage'
 import {
   getFactory,
   getFactoryImage,
@@ -23,6 +32,11 @@ export function FactoryMapPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
+  const [mode, setMode] = useState<MapMode>(() => loadMapMode('factory', factoryId))
+  const [diagram, setDiagram] = useState<DiagramData>({ nodes: [], edges: [] })
+  const saveDiagramTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const diagramRef = useRef(diagram)
+  diagramRef.current = diagram
 
   useEffect(() => {
     if (!factoryId || Number.isNaN(factoryId)) return
@@ -34,20 +48,18 @@ export function FactoryMapPage() {
       getFactory(factoryId),
       getFactoryImage(factoryId).catch(() => null),
       listProcesses(factoryId),
+      loadDiagram('factory', factoryId),
     ])
-      .then(([factoryData, imgData, processesData]) => {
+      .then(([factoryData, imgData, processesData, diagramData]) => {
         if (!active) return
         setFactory(factoryData)
         if (imgData?.imageBase64 && imgData.width && imgData.height) {
-          setImage({
-            base64: imgData.imageBase64,
-            width: imgData.width,
-            height: imgData.height,
-          })
+          setImage({ base64: imgData.imageBase64, width: imgData.width, height: imgData.height })
         } else {
           setImage(null)
         }
         setProcesses(processesData)
+        setDiagram(diagramData)
       })
       .catch((err) => {
         if (!active) return
@@ -62,7 +74,15 @@ export function FactoryMapPage() {
     }
   }, [factoryId])
 
-  // 공정들 → MapPin 변환 (실시간 데이터 없음)
+  useEffect(() => {
+    return () => {
+      if (saveDiagramTimerRef.current) {
+        clearTimeout(saveDiagramTimerRef.current)
+        saveDiagram('factory', factoryId, diagramRef.current)
+      }
+    }
+  }, [factoryId])
+
   const pins: MapPin[] = useMemo(() => {
     return processes.map((p) => {
       const parsed = parsePosition(p.position)
@@ -71,12 +91,22 @@ export function FactoryMapPage() {
         code: p.code,
         name: p.name,
         position: parsed ? { x: parsed.x, y: parsed.y } : null,
-        size: parsed?.width && parsed?.height ? { width: parsed.width, height: parsed.height } : undefined,
-        // 공정은 실시간 데이터 직접 없음 (그냥 회색 핀)
+        size:
+          parsed?.width && parsed?.height
+            ? { width: parsed.width, height: parsed.height }
+            : undefined,
         live: { hasData: false },
       }
     })
   }, [processes])
+
+  function handleDiagramChange(next: DiagramData) {
+    setDiagram(next)
+    if (saveDiagramTimerRef.current) clearTimeout(saveDiagramTimerRef.current)
+    saveDiagramTimerRef.current = setTimeout(() => {
+      saveDiagram('factory', factoryId, next)
+    }, 600)
+  }
 
   async function handleImageUpload(base64: string, width: number, height: number) {
     await putFactoryImage(factoryId, { imageBase64: base64, width, height })
@@ -88,11 +118,20 @@ export function FactoryMapPage() {
     setImage(null)
   }
 
-  // 공정의 position 변경은 PUT으로 전체 업데이트 (별도 PATCH API 없음)
-  async function savePosition(pinId: number | string, x: number, y: number, width?: number, height?: number) {
+  async function savePosition(
+    pinId: number | string,
+    x: number,
+    y: number,
+    width?: number,
+    height?: number,
+  ) {
     const target = processes.find((p) => p.id === pinId)
     if (!target) return
-    const positionJson = JSON.stringify({ x, y, ...(width && height ? { w: width, h: height } : {}) })
+    const positionJson = JSON.stringify({
+      x,
+      y,
+      ...(width && height ? { w: width, h: height } : {}),
+    })
     await updateProcess(Number(pinId), {
       factoryId: target.factoryId,
       code: target.code,
@@ -116,7 +155,6 @@ export function FactoryMapPage() {
     return savePosition(pinId, existing.x, existing.y, size.width, size.height)
   }
 
-  // 공정 핀 클릭 → 공정 도면 페이지로 이동 (계층 탐색)
   function handlePinClick(pinId: number | string) {
     navigate(`/service/process/${pinId}/map`)
   }
@@ -165,6 +203,35 @@ export function FactoryMapPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex border border-slate-200 rounded-lg overflow-hidden text-[12px]">
+            <button
+              onClick={() => {
+                setMode('image')
+                saveMapMode('factory', factoryId, 'image')
+              }}
+              className={`h-8 px-3 transition-colors ${
+                mode === 'image'
+                  ? 'bg-[#003087] text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              이미지
+            </button>
+            <button
+              onClick={() => {
+                setMode('diagram')
+                saveMapMode('factory', factoryId, 'diagram')
+              }}
+              className={`h-8 px-3 transition-colors border-l border-slate-200 ${
+                mode === 'diagram'
+                  ? 'bg-[#003087] text-white'
+                  : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              다이어그램
+            </button>
+          </div>
+
           {editMode ? (
             <button
               onClick={() => setEditMode(false)}
@@ -196,17 +263,50 @@ export function FactoryMapPage() {
         </div>
       </div>
 
-      <LayoutMap
-        image={image}
-        pins={pins}
-        editMode={editMode}
-        pinStyle="card"
-        onImageUpload={handleImageUpload}
-        onImageDelete={handleImageDelete}
-        onPinMove={handlePinMove}
-        onPinResize={handlePinResize}
-        onPinClick={handlePinClick}
-      />
+      {mode === 'image' ? (
+        <LayoutMap
+          image={image}
+          pins={pins}
+          editMode={editMode}
+          pinStyle="card"
+          onImageUpload={handleImageUpload}
+          onImageDelete={handleImageDelete}
+          onPinMove={handlePinMove}
+          onPinResize={handlePinResize}
+          onPinClick={handlePinClick}
+        />
+      ) : (
+        <>
+          <DiagramMap
+            nodes={diagram.nodes}
+            edges={diagram.edges}
+            editMode={editMode}
+            backgroundImage={image}
+            zoneOptions={processes.map((p) => ({ id: p.id, name: p.name }))}
+            onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
+          />
+          {diagram.nodes.some((n) => n.type === 'zone') && (
+            <div className="flex items-center gap-2 flex-wrap px-1">
+              <span className="text-[11px] text-slate-400 flex-shrink-0">등록된 영역</span>
+              {diagram.nodes
+                .filter((n) => n.type === 'zone')
+                .map((n) => {
+                  const linked = n.linkedId ? processes.find((p) => p.id === n.linkedId) : null
+                  return (
+                    <span
+                      key={n.id}
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full border border-slate-200"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />
+                      {n.label || '(이름 없음)'}
+                      {linked && <span className="text-slate-400">· {linked.name}</span>}
+                    </span>
+                  )
+                })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

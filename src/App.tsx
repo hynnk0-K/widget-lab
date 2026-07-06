@@ -42,6 +42,8 @@ import { SitePage } from '@/pages/system/site'
 import { SiteMapPage } from '@/pages/system/site/[id]/map'
 
 import { TsdbComparePage } from '@/pages/demo/tsdb-compare'
+import { ScaleBenchmarkPage } from '@/pages/demo/scale-benchmark'
+import { EhsComparePage } from '@/pages/demo/ehs-compare'
 
 function AuthGuard({ children }: { children: ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -129,6 +131,8 @@ function App() {
                     <Route path="/system/site" element={<SitePage />} />
                     <Route path="/system/site/:id/map" element={<SiteMapPage />} />
                     <Route path="/demo/tsdb-compare" element={<TsdbComparePage />} />
+                    <Route path="/demo/scale-benchmark" element={<ScaleBenchmarkPage />} />
+                    <Route path="/demo/ehs-compare" element={<EhsComparePage />} />
                   </Routes>
                 </Layout>
               </AuthGuard>

@@ -281,12 +281,33 @@ export function ProcessMapPage() {
           onPinClick={handlePinClick}
         />
       ) : (
-        <DiagramMap
-          nodes={diagram.nodes}
-          edges={diagram.edges}
-          editMode={editMode}
-          onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
-        />
+        <>
+          <DiagramMap
+            nodes={diagram.nodes}
+            edges={diagram.edges}
+            editMode={editMode}
+            backgroundImage={image}
+            zoneOptions={lines.map((l) => ({ id: l.id, name: l.name }))}
+            onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
+          />
+          {diagram.nodes.some((n) => n.type === 'zone') && (
+            <div className="flex items-center gap-2 flex-wrap px-1">
+              <span className="text-[11px] text-slate-400 flex-shrink-0">등록된 영역</span>
+              {diagram.nodes
+                .filter((n) => n.type === 'zone')
+                .map((n) => {
+                  const linked = n.linkedId ? lines.find((l) => l.id === n.linkedId) : null
+                  return (
+                    <span key={n.id} className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full border border-slate-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />
+                      {n.label || '(이름 없음)'}
+                      {linked && <span className="text-slate-400">· {linked.name}</span>}
+                    </span>
+                  )
+                })}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
