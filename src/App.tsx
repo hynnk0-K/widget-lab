@@ -6,11 +6,7 @@ import { useAuthStore } from '@/entities/user/model/authStore'
 import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
-import { RealtimeWbgtPage } from '@/pages/realtime/wbgt'
 import { EhsDetailPage } from '@/pages/realtime/ehs-detail'
-import { RealtimeGasPage } from '@/pages/realtime/gas'
-import { RealtimeMotionPage } from '@/pages/realtime/motion'
-import { RealtimeCitygasPage } from '@/pages/realtime/citygas'
 import { RealtimeEnvironmentPage } from '@/pages/realtime/environment'
 import { RealtimeSafetyPage } from '@/pages/realtime/safety'
 import { RealtimeFirefightingPage } from '@/pages/realtime/firefighting'
@@ -67,10 +63,6 @@ function App() {
                     <Route path="/" element={<Navigate to="/realtime/dashboard" replace />} />
                     <Route path="/realtime/dashboard" element={<HomePage />} />
                     <Route path="/realtime/ehs-detail/:category" element={<EhsDetailPage />} />
-                    <Route path="/realtime/wbgt" element={<RealtimeWbgtPage />} />
-                    <Route path="/realtime/gas" element={<RealtimeGasPage />} />
-                    <Route path="/realtime/motion" element={<RealtimeMotionPage />} />
-                    <Route path="/realtime/citygas" element={<RealtimeCitygasPage />} />
                     <Route path="/realtime/environment" element={<RealtimeEnvironmentPage />} />
                     <Route path="/realtime/safety" element={<RealtimeSafetyPage />} />
                     <Route path="/realtime/firefighting" element={<RealtimeFirefightingPage />} />
