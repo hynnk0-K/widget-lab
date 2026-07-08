@@ -15,7 +15,7 @@ import type { EhsRiskLevel, MetricSpec, EhsCategoryConfig } from './types'
 
 export const RISK_LABEL: Record<EhsRiskLevel, string> = {
   normal: '정상',
-  caution: '관심',
+  caution: '주의',
   warning: '경고',
   danger: '위험',
 }

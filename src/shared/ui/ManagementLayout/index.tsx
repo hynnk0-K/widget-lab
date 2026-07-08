@@ -15,6 +15,7 @@ const SECTION_CONFIG: Record<
     label: '실시간 모니터링',
     tabs: [
       { label: '대시보드', href: '/realtime/dashboard' },
+      { label: '계층 현황', href: '/realtime/overview' },
       { label: '체감온도', href: '/realtime/ehs-detail/wbgt' },
       { label: '밀폐공간 유해가스', href: '/realtime/ehs-detail/confined_gas' },
       { label: '이동형 모션센서', href: '/realtime/ehs-detail/motion' },
@@ -63,6 +64,7 @@ const SECTION_CONFIG: Record<
 
 const IMPLEMENTED = new Set([
   '/realtime/dashboard',
+  '/realtime/overview',
   '/realtime/ehs-detail/wbgt',
   '/realtime/ehs-detail/confined_gas',
   '/realtime/ehs-detail/motion',

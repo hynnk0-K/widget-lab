@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { cn } from '@/shared/lib/cn'
-import { fetchLatest, fetchTrend, type EhsLatestRow, type TrendPoint } from '@/entities/ehs/api/ehsApi'
+import {
+  fetchLatest,
+  fetchTrend,
+  type EhsLatestRow,
+  type TrendPoint,
+} from '@/entities/ehs/api/ehsApi'
 import { calcRisk, RISK_COLOR_BG, RISK_COLOR_TEXT } from '@/entities/ehs/model/config'
 import type { EhsCategoryConfig } from '@/entities/ehs/model/types'
 

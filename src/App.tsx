@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { Providers } from '@/app/providers'
 import { Layout } from '@/shared/ui/Layout'
 import { useAuthStore } from '@/entities/user/model/authStore'
@@ -7,6 +7,7 @@ import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
 import { EhsDetailPage } from '@/pages/realtime/ehs-detail'
+import { RealtimeOverviewPage } from '@/pages/realtime/overview'
 import { RealtimeEnvironmentPage } from '@/pages/realtime/environment'
 import { RealtimeSafetyPage } from '@/pages/realtime/safety'
 import { RealtimeFirefightingPage } from '@/pages/realtime/firefighting'
@@ -42,6 +43,11 @@ import { TsdbComparePage } from '@/pages/demo/tsdb-compare'
 import { ScaleBenchmarkPage } from '@/pages/demo/scale-benchmark'
 import { EhsComparePage } from '@/pages/demo/ehs-compare'
 
+function EhsDetailKeyWrapper() {
+  const { category = '' } = useParams<{ category: string }>()
+  return <EhsDetailPage key={category} />
+}
+
 function AuthGuard({ children }: { children: ReactNode }) {
   const token = useAuthStore((s) => s.token)
   if (!token) return <Navigate to="/login" replace />
@@ -62,7 +68,8 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/realtime/dashboard" replace />} />
                     <Route path="/realtime/dashboard" element={<HomePage />} />
-                    <Route path="/realtime/ehs-detail/:category" element={<EhsDetailPage />} />
+                    <Route path="/realtime/overview" element={<RealtimeOverviewPage />} />
+                    <Route path="/realtime/ehs-detail/:category" element={<EhsDetailKeyWrapper />} />
                     <Route path="/realtime/environment" element={<RealtimeEnvironmentPage />} />
                     <Route path="/realtime/safety" element={<RealtimeSafetyPage />} />
                     <Route path="/realtime/firefighting" element={<RealtimeFirefightingPage />} />

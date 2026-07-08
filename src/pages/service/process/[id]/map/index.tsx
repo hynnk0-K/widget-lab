@@ -288,6 +288,7 @@ export function ProcessMapPage() {
             editMode={editMode}
             backgroundImage={image}
             zoneOptions={lines.map((l) => ({ id: l.id, name: l.name }))}
+            onZoneClick={(id) => navigate(`/service/line/${id}/map`)}
             onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
           />
           {diagram.nodes.some((n) => n.type === 'zone') && (

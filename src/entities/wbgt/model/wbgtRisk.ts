@@ -2,7 +2,7 @@ export type WbgtRiskLevel = 'normal' | 'caution' | 'warning' | 'danger' | 'extre
 
 export const WBGT_RISK_LABEL: Record<WbgtRiskLevel, string> = {
   normal: '정상',
-  caution: '관심',
+  caution: '주의',
   warning: '주의',
   danger: '경고',
   extreme: '위험',

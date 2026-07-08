@@ -55,6 +55,7 @@ const SYMBOL_LABELS: Record<PidSymbolType, string> = {
   motor: '모터',
   generic: '일반 장비',
   zone: '영역',
+  equipment: '설비',
 }
 
 const SYMBOL_CATEGORIES: { label: string; types: PidSymbolType[] }[] = [
@@ -75,6 +76,7 @@ export function getDefaultDims(type: PidSymbolType): { w: number; h: number } {
   if (type === 'tank') return { w: 28, h: 60 }
   if (type === 'generic') return { w: 68, h: 36 }
   if (type === 'zone') return { w: 160, h: 100 }
+  if (type === 'equipment') return { w: 36, h: 36 }
   return { w: 40, h: 40 }
 }
 
@@ -163,6 +165,13 @@ function SymbolSvg({ type }: { type: PidSymbolType }) {
           <text x={16} y={21} textAnchor="middle" fontSize={13} fontWeight="bold" fill={c}>
             M
           </text>
+        </svg>
+      )
+    case 'equipment':
+      return (
+        <svg width={32} height={32} viewBox="0 0 32 32">
+          <rect x={2} y={2} width={28} height={28} rx={4} fill="none" stroke={c} strokeWidth={sw} />
+          <circle cx={16} cy={16} r={4} fill={c} />
         </svg>
       )
     default: // generic
@@ -307,6 +316,21 @@ function Symbol({
           />
         </>
       )
+    case 'equipment':
+      return (
+        <>
+          <Rect
+            x={2}
+            y={2}
+            width={w - 4}
+            height={h - 4}
+            stroke={color}
+            strokeWidth={1.5}
+            cornerRadius={4}
+          />
+          <Circle x={w / 2} y={h / 2} radius={4} fill={color} />
+        </>
+      )
     default:
       return (
         <Rect
@@ -369,7 +393,7 @@ interface EditState {
   linkedId: number | null
 }
 
-let _id = 1
+let _id = Date.now()
 
 export function DiagramMap({
   nodes,
@@ -877,7 +901,9 @@ export function DiagramMap({
                 const dims = nodeDims(node)
                 const isSel = selectedId === node.id
                 const zoneData = node.linkedId != null ? zoneValueMap?.[node.linkedId] : undefined
-                const zColor = zoneData ? (ZONE_RISK_HEX[zoneData.risk] ?? '#64748b') : '#64748b'
+                const zColor = zoneData
+                  ? (ZONE_RISK_HEX[zoneData.risk] ?? '#64748b')
+                  : (node.color ?? '#64748b')
 
                 return (
                   <Group
@@ -904,7 +930,15 @@ export function DiagramMap({
                       width={dims.w}
                       height={dims.h}
                       fill={zColor}
-                      opacity={zoneData ? 0.15 : 0.04}
+                      opacity={
+                        zoneData
+                          ? 0.15
+                          : node.zoneKind === 'line'
+                            ? 0.02
+                            : node.zoneKind === 'type'
+                              ? 0.08
+                              : 0.04
+                      }
                       cornerRadius={6}
                       listening={false}
                     />

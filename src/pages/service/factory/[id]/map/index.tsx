@@ -283,6 +283,7 @@ export function FactoryMapPage() {
             editMode={editMode}
             backgroundImage={image}
             zoneOptions={processes.map((p) => ({ id: p.id, name: p.name }))}
+            onZoneClick={(id) => navigate(`/service/process/${id}/map`)}
             onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}
           />
           {diagram.nodes.some((n) => n.type === 'zone') && (

@@ -11,7 +11,8 @@ export type PidSymbolType =
   | 'pump'
   | 'motor'
   | 'generic'
-  | 'zone'             // 구역 레이블 (WBGT 등 오버레이용)
+  | 'zone' // 구역 레이블 (WBGT 등 오버레이용)
+  | 'equipment' // 스크립트 자동 생성 설비 노드
 
 export interface DiagramNode {
   id: string
@@ -19,12 +20,15 @@ export interface DiagramNode {
   x: number
   y: number
   rotation?: number
-  label?: string       // instrument: 버블 안 태그(LT, LC), 그 외: 아래 레이블
+  label?: string // instrument: 버블 안 태그(LT, LC), 그 외: 아래 레이블
   deviceCode?: string
-  width?: number       // 사용자 지정 너비 (없으면 심볼 기본 크기)
-  height?: number      // 사용자 지정 높이
+  width?: number // 사용자 지정 너비 (없으면 심볼 기본 크기)
+  height?: number // 사용자 지정 높이
   imageBase64?: string // 설정 시 심볼 대신 이미지 렌더
-  linkedId?: number    // zone 타입: 연결된 공정/라인 ID (WBGT 등 실시간 데이터 매핑용)
+  linkedId?: number // zone: 연결된 공정/라인 ID, equipment: 설비 ID
+  zoneKind?: 'line' | 'type' // 자동 생성 zone 구분 (line=배경, type=타입그룹)
+  color?: string // zone 커스텀 색상 (타입그룹별)
+  equipmentType?: string // 설비 타입 분류 (WBGT, CNC 등)
 }
 
 export interface DiagramEdge {
@@ -74,9 +78,15 @@ function migrate(raw: Record<string, unknown>): DiagramData {
   // React Flow 형식 감지
   if (rawNodes[0]?.position && typeof rawNodes[0].position === 'object') {
     const typeMap: Record<string, PidSymbolType> = {
-      pump: 'pump', valve: 'valve_gate', tank: 'tank',
-      sensor: 'instrument', compressor: 'generic', motor: 'motor',
-      filter: 'generic', heater: 'generic', generic: 'generic',
+      pump: 'pump',
+      valve: 'valve_gate',
+      tank: 'tank',
+      sensor: 'instrument',
+      compressor: 'generic',
+      motor: 'motor',
+      filter: 'generic',
+      heater: 'generic',
+      generic: 'generic',
     }
     const nodes: DiagramNode[] = rawNodes.map((n) => {
       const pos = n.position as { x: number; y: number }
@@ -102,11 +112,14 @@ function migrate(raw: Record<string, unknown>): DiagramData {
 
   return {
     nodes: rawNodes as unknown as DiagramNode[],
-    edges: ((raw.edges ?? []) as unknown[]) as DiagramEdge[],
+    edges: (raw.edges ?? []) as unknown[] as DiagramEdge[],
   }
 }
 
-export async function loadDiagram(scope: 'factory' | 'process' | 'line', id: number): Promise<DiagramData> {
+export async function loadDiagram(
+  scope: 'factory' | 'process' | 'line',
+  id: number,
+): Promise<DiagramData> {
   try {
     const data = await api.get<Record<string, unknown>>(`${SCOPE_PATH[scope]}/${id}/diagram`)
     return migrate(data)
@@ -115,6 +128,10 @@ export async function loadDiagram(scope: 'factory' | 'process' | 'line', id: num
   }
 }
 
-export async function saveDiagram(scope: 'factory' | 'process' | 'line', id: number, data: DiagramData) {
+export async function saveDiagram(
+  scope: 'factory' | 'process' | 'line',
+  id: number,
+  data: DiagramData,
+) {
   await api.put(`${SCOPE_PATH[scope]}/${id}/diagram`, data)
 }
