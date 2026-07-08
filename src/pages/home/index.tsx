@@ -1,93 +1,15 @@
-import { useEffect, useState } from 'react'
-import { api } from '@/shared/lib/api'
-import { useAuthStore } from '@/entities/user/model/authStore'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { WidgetGrid } from '@/widgets/dashboard-grid/ui/WidgetGrid'
 import { AddWidgetModal } from '@/features/widget-personalize/ui/AddWidgetModal'
-import type { DashboardLayout, Widget } from '@/entities/widget/model/types'
-
-interface UserDashboard {
-  userId: number
-  username: string
-  displayName: string
-  layout: string
-  updatedAt: string
-}
-
-function nextPosition(widgets: Widget[]) {
-  if (widgets.length === 0) return { x: 0, y: 0 }
-  const maxY = Math.max(...widgets.map((wg) => wg.y + wg.h))
-  return { x: 0, y: maxY }
-}
-
-function parseLayout(raw: string): DashboardLayout {
-  try {
-    const first = JSON.parse(raw)
-    // 이중 인코딩 방어: 파싱 결과가 여전히 string이면 한 번 더 파싱
-    return typeof first === 'string' ? JSON.parse(first) : first
-  } catch {
-    return { version: 1, widgets: [] }
-  }
-}
+import { useHomeDashboard } from './model/useHomeDashboard'
 
 export function HomePage() {
-  const username = useAuthStore((s) => s.user?.username ?? '')
-  const [layout, setLayout] = useState<DashboardLayout | null>(null)
-  const [editMode, setEditMode] = useState(false)
-  const [showModal, setShowModal] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
-  const [refreshKey, setRefreshKey] = useState(0)
-
-  // layout === null 이면 로딩 중 (setLoading 상태 없이 파생)
-  useEffect(() => {
-    if (!username) return
-    api
-      .get<UserDashboard>(`/dashboards/${username}`)
-      .then((data) => setLayout(parseLayout(data.layout)))
-      .catch(() => setLayout({ version: 1, widgets: [] }))
-  }, [username, refreshKey])
-
-  async function handleSave() {
-    if (!layout) return
-    setSaving(true)
-    setSaveError('')
-    try {
-      // text/plain + raw JSON string → Spring @RequestBody String이 outer quote 없이 받음
-      await api.putString<UserDashboard>(`/dashboards/${username}`, JSON.stringify(layout))
-      setEditMode(false)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '저장 실패')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function handleCancelEdit() {
-    setEditMode(false)
-    setSaveError('')
-    setLayout(null)
-    setRefreshKey((k) => k + 1)
-  }
-
-  function handleRemove(id: string) {
-    setLayout((prev) =>
-      prev ? { ...prev, widgets: prev.widgets.filter((w) => w.id !== id) } : prev,
-    )
-  }
-
-  function handleLayoutChange(updatedWidgets: Widget[]) {
-    setLayout((prev) => (prev ? { ...prev, widgets: updatedWidgets } : prev))
-  }
-
-  function handleAddWidget(partial: Omit<Widget, 'id'>) {
-    const id = `w_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-    const { x, y } = nextPosition(layout?.widgets ?? [])
-    const widget: Widget = { ...partial, id, x, y }
-    setLayout((prev) => (prev ? { ...prev, widgets: [...prev.widgets, widget] } : prev))
-    setShowModal(false)
-    if (!editMode) setEditMode(true)
-  }
+  const {
+    layout, editMode, setEditMode,
+    showModal, setShowModal,
+    saving, saveError,
+    handleSave, handleCancelEdit, handleRemove, handleLayoutChange, handleAddWidget,
+  } = useHomeDashboard()
 
   if (layout === null) {
     return (
@@ -105,94 +27,74 @@ export function HomePage() {
   return (
     <ManagementLayout section="realtime">
       <div className="flex flex-col gap-3 p-5 h-full">
-      {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
-        <p className="m-0 text-[12px] text-slate-400">위젯 {layout.widgets.length}개</p>
+        <div className="flex items-center justify-between">
+          <p className="m-0 text-[12px] text-slate-400">위젯 {layout.widgets.length}개</p>
 
-        <div className="flex items-center gap-2">
-          {editMode ? (
-            <>
-              {saveError && <span className="text-[12px] text-red-500">{saveError}</span>}
+          <div className="flex items-center gap-2">
+            {editMode ? (
+              <>
+                {saveError && <span className="text-[12px] text-red-500">{saveError}</span>}
+                <button
+                  onClick={handleCancelEdit}
+                  className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="h-8 px-4 border border-[#003087] text-[#003087] text-[13px] rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  + 위젯 추가
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="h-8 px-4 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors disabled:opacity-60"
+                >
+                  {saving ? '저장 중...' : '저장'}
+                </button>
+              </>
+            ) : (
               <button
-                onClick={handleCancelEdit}
-                className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors"
+                onClick={() => setEditMode(true)}
+                className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
               >
-                취소
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={2}>
+                  <path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                위젯 편집
               </button>
-              <button
-                onClick={() => setShowModal(true)}
-                className="h-8 px-4 border border-[#003087] text-[#003087] text-[13px] rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                + 위젯 추가
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="h-8 px-4 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors disabled:opacity-60"
-              >
-                {saving ? '저장 중...' : '저장'}
-              </button>
-            </>
-          ) : (
+            )}
+          </div>
+        </div>
+
+        {layout.widgets.length > 0 ? (
+          <WidgetGrid
+            layout={layout}
+            editMode={editMode}
+            onRemove={handleRemove}
+            onLayoutChange={handleLayoutChange}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center min-h-[320px] bg-white rounded-xl border-2 border-dashed border-slate-200">
+            <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 48 48" stroke="currentColor" strokeWidth={1.5}>
+              <rect x="4" y="4" width="18" height="18" rx="3" />
+              <rect x="26" y="4" width="18" height="18" rx="3" />
+              <rect x="4" y="26" width="18" height="18" rx="3" />
+              <rect x="26" y="26" width="18" height="18" rx="3" />
+            </svg>
+            <p className="text-[14px] font-medium text-slate-400 m-0">위젯이 없습니다</p>
+            <p className="text-[12px] text-slate-300 mt-1 mb-4 m-0">위젯을 추가해 나만의 대시보드를 만들어보세요</p>
             <button
-              onClick={() => setEditMode(true)}
-              className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+              onClick={() => setShowModal(true)}
+              className="h-9 px-5 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors"
             >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                viewBox="0 0 16 16"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              위젯 편집
+              + 첫 위젯 추가
             </button>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {/* 위젯 그리드 or 빈 상태 */}
-      {layout && layout.widgets.length > 0 ? (
-        <WidgetGrid
-          layout={layout}
-          editMode={editMode}
-          onRemove={handleRemove}
-          onLayoutChange={handleLayoutChange}
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center min-h-[320px] bg-white rounded-xl border-2 border-dashed border-slate-200">
-          <svg
-            className="w-12 h-12 text-slate-300 mb-3"
-            fill="none"
-            viewBox="0 0 48 48"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <rect x="4" y="4" width="18" height="18" rx="3" />
-            <rect x="26" y="4" width="18" height="18" rx="3" />
-            <rect x="4" y="26" width="18" height="18" rx="3" />
-            <rect x="26" y="26" width="18" height="18" rx="3" />
-          </svg>
-          <p className="text-[14px] font-medium text-slate-400 m-0">위젯이 없습니다</p>
-          <p className="text-[12px] text-slate-300 mt-1 mb-4 m-0">
-            위젯을 추가해 나만의 대시보드를 만들어보세요
-          </p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="h-9 px-5 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors"
-          >
-            + 첫 위젯 추가
-          </button>
-        </div>
-      )}
-
-      {showModal && <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />}
+        {showModal && <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />}
       </div>
     </ManagementLayout>
   )

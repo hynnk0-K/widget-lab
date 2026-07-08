@@ -1,32 +1,29 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
-import type { FormField } from '@/shared/ui/FormModal'
-import { listFactories } from '@/entities/factory/api/factoryApi'
-import { listProcesses, createProcess, updateProcess, deleteProcess } from '@/entities/process/api/processApi'
-import type { Process } from '@/entities/process/model/types'
+import { useProcessCrud, type ProcessRow } from './model/useProcessCrud'
 
-interface Factory {
-  id: number
-  name: string
-}
-interface ProcessRow extends Process {
-  factory?: Factory
-  factoryName?: string
-}
+export function ProcessPage() {
+  const navigate = useNavigate()
+  const {
+    rows, loading,
+    formOpen, setFormOpen,
+    editTarget, formValues, setFormValues,
+    deleteTargets, setDeleteTargets,
+    openCreate, openEdit, handleSubmit, handleDelete,
+    fields,
+  } = useProcessCrud()
 
-function buildColumns(navigate: (path: string) => void): Column[] {
-  return [
+  const columns: Column[] = [
     {
       key: 'factory',
       label: '공장',
       width: '160px',
       render: (v, row) => {
-        const f = v as Factory | undefined
+        const f = v as { name: string } | undefined
         return f?.name ?? (row.factoryName as string | undefined) ?? '-'
       },
     },
@@ -39,19 +36,10 @@ function buildColumns(navigate: (path: string) => void): Column[] {
       width: '100px',
       render: (_v, row) => (
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/service/process/${row.id}/map`)
-          }}
+          onClick={(e) => { e.stopPropagation(); navigate(`/service/process/${row.id}/map`) }}
           className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
         >
-          <svg
-            className="w-3 h-3"
-            fill="none"
-            viewBox="0 0 12 12"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2}>
             <rect x="1" y="2" width="10" height="8" rx="1" />
             <circle cx="4" cy="5" r="0.8" />
             <path d="M1 8l3-3 2.5 2.5L8 6l3 3" />
@@ -60,92 +48,6 @@ function buildColumns(navigate: (path: string) => void): Column[] {
         </button>
       ),
     },
-  ]
-}
-
-const EMPTY: Record<string, string> = { factoryId: '', code: '', name: '', description: '' }
-
-export function ProcessPage() {
-  const [rows, setRows] = useState<ProcessRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [factories, setFactories] = useState<Factory[]>([])
-  const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<ProcessRow | null>(null)
-  const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<ProcessRow[]>([])
-
-  const navigate = useNavigate()
-  const columns = buildColumns(navigate)
-
-  useEffect(() => {
-    loadRows()
-    listFactories().then(setFactories).catch(() => setFactories([]))
-  }, [])
-
-  async function loadRows() {
-    setLoading(true)
-    try {
-      setRows(await listProcesses())
-    } catch {
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function openCreate() {
-    setEditTarget(null)
-    setFormValues(EMPTY)
-    setFormOpen(true)
-  }
-
-  function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as ProcessRow
-    setEditTarget(r)
-    setFormValues({
-      factoryId: String(r.factory?.id ?? r.factoryId ?? ''),
-      code: r.code,
-      name: r.name,
-      description: r.description ?? '',
-    })
-    setFormOpen(true)
-  }
-
-  async function handleSubmit() {
-    const body = {
-      factoryId: Number(formValues.factoryId),
-      code: formValues.code,
-      name: formValues.name,
-      description: formValues.description,
-    }
-    if (editTarget) {
-      await updateProcess(editTarget.id, body)
-    } else {
-      await createProcess(body)
-    }
-    setFormOpen(false)
-    loadRows()
-  }
-
-  async function handleDelete() {
-    for (const t of deleteTargets) {
-      await deleteProcess(t.id)
-    }
-    setDeleteTargets([])
-    loadRows()
-  }
-
-  const fields: FormField[] = [
-    {
-      key: 'factoryId',
-      label: '공장',
-      type: 'select',
-      required: true,
-      options: factories.map((f) => ({ value: String(f.id), label: f.name })),
-    },
-    { key: 'code', label: '코드', type: 'text', required: true, placeholder: 'PROC-001' },
-    { key: 'name', label: '이름', type: 'text', required: true, placeholder: '공정명' },
-    { key: 'description', label: '설명', type: 'textarea', placeholder: '설명 (선택)' },
   ]
 
   return (
@@ -171,11 +73,7 @@ export function ProcessPage() {
       )}
       {deleteTargets.length > 0 && (
         <ConfirmModal
-          message={
-            deleteTargets.length === 1
-              ? `"${deleteTargets[0].name}" 공정을 삭제하시겠습니까?`
-              : `선택한 ${deleteTargets.length}개 공정을 삭제하시겠습니까?`
-          }
+          message={deleteTargets.length === 1 ? `"${deleteTargets[0].name}" 공정을 삭제하시겠습니까?` : `선택한 ${deleteTargets.length}개 공정을 삭제하시겠습니까?`}
           detail="삭제 시 하위 라인 데이터에 영향을 줄 수 있습니다."
           onConfirm={handleDelete}
           onClose={() => setDeleteTargets([])}

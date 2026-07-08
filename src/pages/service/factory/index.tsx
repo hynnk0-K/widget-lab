@@ -1,35 +1,21 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
 import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
-import type { FormField } from '@/shared/ui/FormModal'
-import { listSites } from '@/entities/site/api/siteApi'
-import { listFactories, createFactory, updateFactory, deleteFactory } from '@/entities/factory/api/factoryApi'
-import type { Factory } from '@/entities/factory/model/types'
-
-interface Site {
-  id: number
-  name: string
-}
-interface FactoryRow extends Factory {
-  site?: Site
-  siteName?: string
-}
-
-const EMPTY: Record<string, string> = { siteId: '', code: '', name: '', description: '' }
+import { useFactoryCrud, type FactoryRow } from './model/useFactoryCrud'
 
 export function FactoryPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<FactoryRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sites, setSites] = useState<Site[]>([])
-  const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<FactoryRow | null>(null)
-  const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<FactoryRow[]>([])
+  const {
+    rows, loading,
+    formOpen, setFormOpen,
+    editTarget, formValues, setFormValues,
+    deleteTargets, setDeleteTargets,
+    openCreate, openEdit, handleSubmit, handleDelete,
+    fields,
+  } = useFactoryCrud()
 
   const columns: Column[] = [
     {
@@ -37,7 +23,7 @@ export function FactoryPage() {
       label: '사업장',
       width: '160px',
       render: (v, row) => {
-        const s = v as Site | undefined
+        const s = v as { name: string } | undefined
         return s?.name ?? (row.siteName as string | undefined) ?? '-'
       },
     },
@@ -50,10 +36,7 @@ export function FactoryPage() {
       width: '100px',
       render: (_v, row) => (
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/service/factory/${row.id}/map`)
-          }}
+          onClick={(e) => { e.stopPropagation(); navigate(`/service/factory/${row.id}/map`) }}
           className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
         >
           <svg className="w-3 h-3" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2}>
@@ -65,77 +48,6 @@ export function FactoryPage() {
         </button>
       ),
     },
-  ]
-
-  useEffect(() => {
-    loadRows()
-    listSites().then(setSites).catch(() => setSites([]))
-  }, [])
-
-  async function loadRows() {
-    setLoading(true)
-    try {
-      setRows(await listFactories())
-    } catch {
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function openCreate() {
-    setEditTarget(null)
-    setFormValues(EMPTY)
-    setFormOpen(true)
-  }
-
-  function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as FactoryRow
-    setEditTarget(r)
-    setFormValues({
-      siteId: String(r.site?.id ?? r.siteId ?? ''),
-      code: r.code,
-      name: r.name,
-      description: r.description ?? '',
-    })
-    setFormOpen(true)
-  }
-
-  async function handleSubmit() {
-    const body = {
-      siteId: Number(formValues.siteId),
-      code: formValues.code,
-      name: formValues.name,
-      description: formValues.description,
-    }
-    if (editTarget) {
-      await updateFactory(editTarget.id, body)
-    } else {
-      await createFactory(body)
-    }
-    setFormOpen(false)
-    loadRows()
-  }
-
-  async function handleDelete() {
-    for (const t of deleteTargets) {
-      await deleteFactory(t.id)
-    }
-    setDeleteTargets([])
-    loadRows()
-  }
-
-  const fields: FormField[] = [
-    {
-      key: 'siteId',
-      label: '사업장',
-      type: 'select',
-      required: true,
-      options: sites.map((s) => ({ value: String(s.id), label: s.name })),
-    },
-    { key: 'code', label: '코드', type: 'text', required: true, placeholder: 'FACT-001' },
-    { key: 'name', label: '이름', type: 'text', required: true, placeholder: '공장명' },
-    { key: 'description', label: '설명', type: 'textarea', placeholder: '설명 (선택)' },
   ]
 
   return (
@@ -161,11 +73,7 @@ export function FactoryPage() {
       )}
       {deleteTargets.length > 0 && (
         <ConfirmModal
-          message={
-            deleteTargets.length === 1
-              ? `"${deleteTargets[0].name}" 공장을 삭제하시겠습니까?`
-              : `선택한 ${deleteTargets.length}개 공장을 삭제하시겠습니까?`
-          }
+          message={deleteTargets.length === 1 ? `"${deleteTargets[0].name}" 공장을 삭제하시겠습니까?` : `선택한 ${deleteTargets.length}개 공장을 삭제하시겠습니까?`}
           detail="삭제 시 하위 공정 데이터에 영향을 줄 수 있습니다."
           onConfirm={handleDelete}
           onClose={() => setDeleteTargets([])}

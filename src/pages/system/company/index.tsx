@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DataTable } from '@/shared/ui/DataTable'
@@ -6,8 +5,8 @@ import { FormModal } from '@/shared/ui/FormModal'
 import { ConfirmModal } from '@/shared/ui/ConfirmModal'
 import type { Column } from '@/shared/ui/DataTable'
 import type { FormField } from '@/shared/ui/FormModal'
-import { listCompanies, createCompany, updateCompany, deleteCompany } from '@/entities/company/api/companyApi'
 import type { Company } from '@/entities/company/model/types'
+import { useCompanyCrud } from './model/useCompanyCrud'
 
 const FIELDS: FormField[] = [
   { key: 'code', label: '코드', type: 'text', required: true, placeholder: 'COMP-001' },
@@ -15,16 +14,15 @@ const FIELDS: FormField[] = [
   { key: 'description', label: '설명', type: 'textarea', placeholder: '설명 (선택)' },
 ]
 
-const EMPTY: Record<string, string> = { code: '', name: '', description: '' }
-
 export function CompanyPage() {
   const navigate = useNavigate()
-  const [rows, setRows] = useState<Company[]>([])
-  const [loading, setLoading] = useState(true)
-  const [formOpen, setFormOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Company | null>(null)
-  const [formValues, setFormValues] = useState(EMPTY)
-  const [deleteTargets, setDeleteTargets] = useState<Company[]>([])
+  const {
+    rows, loading,
+    formOpen, setFormOpen,
+    editTarget, formValues, setFormValues,
+    deleteTargets, setDeleteTargets,
+    openCreate, openEdit, handleSubmit, handleDelete,
+  } = useCompanyCrud()
 
   const columns: Column[] = [
     { key: 'code', label: '코드', width: '140px' },
@@ -36,10 +34,7 @@ export function CompanyPage() {
       width: '100px',
       render: (_v, row) => (
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            navigate(`/system/company/${row.id}/map`)
-          }}
+          onClick={(e) => { e.stopPropagation(); navigate(`/system/company/${row.id}/map`) }}
           className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
         >
           <svg className="w-3 h-3" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2}>
@@ -52,51 +47,6 @@ export function CompanyPage() {
       ),
     },
   ]
-
-  useEffect(() => { loadRows() }, [])
-
-  async function loadRows() {
-    setLoading(true)
-    try {
-      setRows(await listCompanies())
-    } catch {
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function openCreate() {
-    setEditTarget(null)
-    setFormValues(EMPTY)
-    setFormOpen(true)
-  }
-
-  function openEdit(row: Record<string, unknown>) {
-    const r = row as unknown as Company
-    setEditTarget(r)
-    setFormValues({ code: r.code, name: r.name, description: r.description ?? '' })
-    setFormOpen(true)
-  }
-
-  async function handleSubmit() {
-    const body = { code: formValues.code, name: formValues.name, description: formValues.description }
-    if (editTarget) {
-      await updateCompany(editTarget.id, body)
-    } else {
-      await createCompany(body)
-    }
-    setFormOpen(false)
-    loadRows()
-  }
-
-  async function handleDelete() {
-    for (const t of deleteTargets) {
-      await deleteCompany(t.id)
-    }
-    setDeleteTargets([])
-    loadRows()
-  }
 
   return (
     <ManagementLayout section="system">
@@ -121,11 +71,7 @@ export function CompanyPage() {
       )}
       {deleteTargets.length > 0 && (
         <ConfirmModal
-          message={
-            deleteTargets.length === 1
-              ? `"${deleteTargets[0].name}" 법인을 삭제하시겠습니까?`
-              : `선택한 ${deleteTargets.length}개 법인을 삭제하시겠습니까?`
-          }
+          message={deleteTargets.length === 1 ? `"${deleteTargets[0].name}" 법인을 삭제하시겠습니까?` : `선택한 ${deleteTargets.length}개 법인을 삭제하시겠습니까?`}
           detail="삭제 시 하위 사업장 데이터에 영향을 줄 수 있습니다."
           onConfirm={handleDelete}
           onClose={() => setDeleteTargets([])}
