@@ -9,6 +9,9 @@ import { StatusBadge } from '@/entities/widget/ui/StatusBadge'
 import { CounterCard } from '@/entities/widget/ui/CounterCard'
 import { MiniBar } from '@/entities/widget/ui/MiniBar'
 import { HeatmapHour } from '@/entities/widget/ui/HeatmapHour'
+import { SummaryCard } from '@/entities/widget/ui/SummaryCard'
+import { AlarmFeedWidget } from '@/entities/widget/ui/AlarmFeedWidget'
+import { FactoryMapWidget } from '@/entities/widget/ui/FactoryMapWidget'
 import type { DashboardLayout, Widget } from '@/entities/widget/model/types'
 
 interface Props {
@@ -86,6 +89,9 @@ export function WidgetGrid({ layout, editMode, onRemove, onLayoutChange }: Props
                 {widget.type === 'counter' && <CounterCard widget={widget} />}
                 {widget.type === 'minibar' && <MiniBar widget={widget} />}
                 {widget.type === 'heatmap' && <HeatmapHour widget={widget} />}
+                {widget.type === 'summary' && <SummaryCard widget={widget} />}
+                {widget.type === 'alarm-feed' && <AlarmFeedWidget widget={widget} />}
+                {widget.type === 'factory-map' && <FactoryMapWidget widget={widget} />}
               </div>
 
               {editMode && (

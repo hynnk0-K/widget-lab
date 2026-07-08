@@ -9,11 +9,19 @@ import { useProcessCrud, type ProcessRow } from './model/useProcessCrud'
 export function ProcessPage() {
   const navigate = useNavigate()
   const {
-    rows, loading,
-    formOpen, setFormOpen,
-    editTarget, formValues, setFormValues,
-    deleteTargets, setDeleteTargets,
-    openCreate, openEdit, handleSubmit, handleDelete,
+    rows,
+    loading,
+    formOpen,
+    setFormOpen,
+    editTarget,
+    formValues,
+    setFormValues,
+    deleteTargets,
+    setDeleteTargets,
+    openCreate,
+    openEdit,
+    handleSubmit,
+    handleDelete,
     fields,
   } = useProcessCrud()
 
@@ -36,10 +44,19 @@ export function ProcessPage() {
       width: '100px',
       render: (_v, row) => (
         <button
-          onClick={(e) => { e.stopPropagation(); navigate(`/service/process/${row.id}/map`) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/service/process/${row.id}/map`)
+          }}
           className="text-[12px] text-[#003087] hover:underline inline-flex items-center gap-1"
         >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2}>
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            viewBox="0 0 12 12"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <rect x="1" y="2" width="10" height="8" rx="1" />
             <circle cx="4" cy="5" r="0.8" />
             <path d="M1 8l3-3 2.5 2.5L8 6l3 3" />
@@ -73,7 +90,11 @@ export function ProcessPage() {
       )}
       {deleteTargets.length > 0 && (
         <ConfirmModal
-          message={deleteTargets.length === 1 ? `"${deleteTargets[0].name}" 공정을 삭제하시겠습니까?` : `선택한 ${deleteTargets.length}개 공정을 삭제하시겠습니까?`}
+          message={
+            deleteTargets.length === 1
+              ? `"${deleteTargets[0].name}" 공정을 삭제하시겠습니까?`
+              : `선택한 ${deleteTargets.length}개 공정을 삭제하시겠습니까?`
+          }
           detail="삭제 시 하위 라인 데이터에 영향을 줄 수 있습니다."
           onConfirm={handleDelete}
           onClose={() => setDeleteTargets([])}

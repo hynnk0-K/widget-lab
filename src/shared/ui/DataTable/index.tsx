@@ -157,7 +157,9 @@ export function DataTable({
                 <input
                   type="checkbox"
                   checked={allSelected}
-                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected
+                  }}
                   onChange={toggleAll}
                   className="w-3.5 h-3.5 rounded border-slate-300 accent-[#003087] cursor-pointer"
                 />

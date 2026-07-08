@@ -5,10 +5,18 @@ import { useHomeDashboard } from './model/useHomeDashboard'
 
 export function HomePage() {
   const {
-    layout, editMode, setEditMode,
-    showModal, setShowModal,
-    saving, saveError,
-    handleSave, handleCancelEdit, handleRemove, handleLayoutChange, handleAddWidget,
+    layout,
+    editMode,
+    setEditMode,
+    showModal,
+    setShowModal,
+    saving,
+    saveError,
+    handleSave,
+    handleCancelEdit,
+    handleRemove,
+    handleLayoutChange,
+    handleAddWidget,
   } = useHomeDashboard()
 
   if (layout === null) {
@@ -59,8 +67,18 @@ export function HomePage() {
                 onClick={() => setEditMode(true)}
                 className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={2}>
-                  <path d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 16 16"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
                 위젯 편집
               </button>
@@ -77,14 +95,20 @@ export function HomePage() {
           />
         ) : (
           <div className="flex flex-col items-center justify-center min-h-[320px] bg-white rounded-xl border-2 border-dashed border-slate-200">
-            <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" viewBox="0 0 48 48" stroke="currentColor" strokeWidth={1.5}>
+            <svg
+              className="w-12 h-12 text-slate-300 mb-3"
+              fill="none"
+              viewBox="0 0 48 48"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
               <rect x="4" y="4" width="18" height="18" rx="3" />
               <rect x="26" y="4" width="18" height="18" rx="3" />
               <rect x="4" y="26" width="18" height="18" rx="3" />
               <rect x="26" y="26" width="18" height="18" rx="3" />
             </svg>
             <p className="text-[14px] font-medium text-slate-400 m-0">위젯이 없습니다</p>
-            <p className="text-[12px] text-slate-300 mt-1 mb-4 m-0">위젯을 추가해 나만의 대시보드를 만들어보세요</p>
+            <p className="text-[12px] text-slate-300 mt-1 mb-4 m-0">위젯을 추가하세요</p>
             <button
               onClick={() => setShowModal(true)}
               className="h-9 px-5 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors"
@@ -94,7 +118,9 @@ export function HomePage() {
           </div>
         )}
 
-        {showModal && <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />}
+        {showModal && (
+          <AddWidgetModal onAdd={handleAddWidget} onClose={() => setShowModal(false)} />
+        )}
       </div>
     </ManagementLayout>
   )

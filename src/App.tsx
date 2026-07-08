@@ -8,6 +8,7 @@ import { HomePage } from '@/pages/home'
 import { DashboardPage } from '@/pages/dashboard'
 import { EhsDetailPage } from '@/pages/realtime/ehs-detail'
 import { RealtimeOverviewPage } from '@/pages/realtime/overview'
+import { ProcessEquipmentPage } from '@/pages/realtime/process/[id]'
 import { RealtimeEnvironmentPage } from '@/pages/realtime/environment'
 import { RealtimeSafetyPage } from '@/pages/realtime/safety'
 import { RealtimeFirefightingPage } from '@/pages/realtime/firefighting'
@@ -69,6 +70,7 @@ function App() {
                     <Route path="/" element={<Navigate to="/realtime/dashboard" replace />} />
                     <Route path="/realtime/dashboard" element={<HomePage />} />
                     <Route path="/realtime/overview" element={<RealtimeOverviewPage />} />
+                    <Route path="/realtime/process/:id" element={<ProcessEquipmentPage />} />
                     <Route path="/realtime/ehs-detail/:category" element={<EhsDetailKeyWrapper />} />
                     <Route path="/realtime/environment" element={<RealtimeEnvironmentPage />} />
                     <Route path="/realtime/safety" element={<RealtimeSafetyPage />} />

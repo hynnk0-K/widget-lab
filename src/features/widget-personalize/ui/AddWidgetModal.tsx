@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/shared/lib/api'
-import type { Widget, WidgetType } from '@/entities/widget/model/types'
+import { listFactories } from '@/entities/factory/api/factoryApi'
+import type { Factory } from '@/entities/factory/model/types'
+import type { Widget, WidgetType, SummaryKind } from '@/entities/widget/model/types'
 
 interface Props {
   onAdd: (widget: Omit<Widget, 'id'>) => void
@@ -63,7 +65,7 @@ const GAUGE_CONFIG: Record<string, { min: number; max: number; warningAt: number
 }
 
 const DEFAULT_GAUGE = { min: 0, max: 100, warningAt: 80 }
-const DEFAULT_SIZE = {
+const DEFAULT_SIZE: Record<WidgetType, { w: number; h: number }> = {
   gauge: { w: 3, h: 2 },
   trend: { w: 6, h: 3 },
   stat: { w: 3, h: 2 },
@@ -71,9 +73,25 @@ const DEFAULT_SIZE = {
   counter: { w: 3, h: 3 },
   minibar: { w: 6, h: 3 },
   heatmap: { w: 6, h: 3 },
+  summary: { w: 3, h: 2 },
+  'alarm-feed': { w: 4, h: 4 },
+  'factory-map': { w: 6, h: 5 },
 }
 
+const SUMMARY_KINDS: { value: SummaryKind; label: string }[] = [
+  { value: 'total', label: '전체 설비' },
+  { value: 'active', label: '가동중' },
+  { value: 'inactive', label: '대기 / 유휴' },
+  { value: 'alarm', label: '오늘 알람' },
+  { value: 'comm-fault', label: '장애 / 통신단절' },
+]
+
+const SOURCELESS_TYPES: WidgetType[] = ['summary', 'alarm-feed', 'factory-map']
+
 const WIDGET_TYPES: { value: WidgetType; label: string; desc: string }[] = [
+  { value: 'summary', label: '설비 요약 카드', desc: '전체/가동/유휴/알람 집계 수치' },
+  { value: 'alarm-feed', label: '실시간 알람 피드', desc: '최신 알람 목록 실시간 표시' },
+  { value: 'factory-map', label: '공장 도면 맵', desc: '공장 배치 이미지에 공정 핀 표시' },
   { value: 'gauge', label: '게이지', desc: '현재 값을 반원 계기판으로 표시' },
   { value: 'trend', label: '추이', desc: '시간에 따른 변화를 꺾은선으로 표시' },
   { value: 'stat', label: '수치 카드', desc: '큰 숫자 + 기간 평균 대비 변화율' },
@@ -99,7 +117,12 @@ function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
 }
 
 export function AddWidgetModal({ onAdd, onClose }: Props) {
-  const [widgetType, setWidgetType] = useState<WidgetType>('gauge')
+  const [widgetType, setWidgetType] = useState<WidgetType>('summary')
+  const [summaryKind, setSummaryKind] = useState<SummaryKind>('total')
+  const [factories, setFactories] = useState<Factory[]>([])
+  const [selectedFactoryId, setSelectedFactoryId] = useState<number | null>(null)
+
+  const isSourceless = SOURCELESS_TYPES.includes(widgetType)
 
   const [devices, setDevices] = useState<EquipmentLive[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
@@ -110,6 +133,12 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
 
   const [metric, setMetric] = useState('')
   const [title, setTitle] = useState('')
+
+  // 공장 목록 로드 (factory-map 타입 선택 시)
+  useEffect(() => {
+    if (widgetType !== 'factory-map') return
+    listFactories().then(setFactories).catch(() => {})
+  }, [widgetType])
 
   // 설비 목록 초기 로드
   useEffect(() => {
@@ -173,11 +202,19 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!title.trim() || !deviceCode || !metric) return
+    if (!title.trim()) return
+    if (!isSourceless && (!deviceCode || !metric)) return
 
     // 타입별 기본 config 생성
     let config: any
-    if (widgetType === 'gauge') {
+    if (widgetType === 'summary') {
+      config = { kind: summaryKind }
+    } else if (widgetType === 'alarm-feed') {
+      config = { maxItems: 10, severity: 'all' }
+    } else if (widgetType === 'factory-map') {
+      if (!selectedFactoryId) return
+      config = { factoryId: selectedFactoryId }
+    } else if (widgetType === 'gauge') {
       config = GAUGE_CONFIG[metric] ?? DEFAULT_GAUGE
     } else if (widgetType === 'trend') {
       config = { hours: 6, intervalMinutes: 5 }
@@ -291,8 +328,55 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
             </div>
           </div>
 
-          {/* 설비 선택 */}
-          <div>
+          {/* summary 종류 선택 */}
+          {widgetType === 'summary' && (
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">집계 항목</label>
+              <div className="grid grid-cols-3 gap-2">
+                {SUMMARY_KINDS.map((k) => (
+                  <button
+                    key={k.value}
+                    type="button"
+                    onClick={() => { setSummaryKind(k.value); setTitle(k.label) }}
+                    className={[
+                      'h-9 px-2 rounded-lg border-2 text-[12px] font-medium transition-all',
+                      summaryKind === k.value
+                        ? 'border-[#003087] bg-blue-50 text-[#003087]'
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300',
+                    ].join(' ')}
+                  >
+                    {k.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* factory-map 공장 선택 */}
+          {widgetType === 'factory-map' && (
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">공장 선택</label>
+              <select
+                value={selectedFactoryId ?? ''}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  setSelectedFactoryId(id)
+                  const f = factories.find((f) => f.id === id)
+                  if (f) setTitle(`${f.name} 도면`)
+                }}
+                required
+                className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer"
+              >
+                <option value="" disabled>공장을 선택하세요</option>
+                {factories.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* 설비 선택 (sourceless 타입은 숨김) */}
+          {!isSourceless && <div>
             <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">설비</label>
             {devicesLoading ? (
               <div className="h-9 border border-slate-200 rounded-lg flex items-center px-3 gap-2 text-slate-400 text-[12px]">
@@ -341,10 +425,10 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
-          {/* 측정 항목 */}
-          <div>
+          {/* 측정 항목 (sourceless 타입은 숨김) */}
+          {!isSourceless && <div>
             <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
               측정 항목
             </label>
@@ -375,7 +459,7 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
                 ))}
               </select>
             )}
-          </div>
+          </div>}
 
           {/* 위젯 제목 */}
           <div>
@@ -384,7 +468,7 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
             </label>
             <input
               type="text"
-              placeholder="설비 + 측정 항목 선택 시 자동 입력됩니다"
+              placeholder={isSourceless ? '제목을 입력하세요' : '설비 + 측정 항목 선택 시 자동 입력됩니다'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-[#003087] transition-colors"
@@ -403,7 +487,11 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={!deviceCode || !metric || !title.trim()}
+              disabled={
+                !title.trim() ||
+                (widgetType === 'factory-map' && !selectedFactoryId) ||
+                (!isSourceless && (!deviceCode || !metric))
+              }
               className="flex-1 h-10 bg-[#003087] text-white rounded-xl text-[13px] font-semibold hover:bg-[#002470] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               추가

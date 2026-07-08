@@ -1,4 +1,4 @@
-export type WidgetType = 'gauge' | 'trend' | 'stat' | 'status' | 'counter' | 'minibar' | 'heatmap'
+export type WidgetType = 'gauge' | 'trend' | 'stat' | 'status' | 'counter' | 'minibar' | 'heatmap' | 'summary' | 'alarm-feed' | 'factory-map'
 
 export interface WidgetSource {
   device: string
@@ -46,6 +46,21 @@ export interface HeatMapConfig {
   days?: number
 }
 
+export type SummaryKind = 'total' | 'active' | 'inactive' | 'alarm' | 'comm-fault'
+
+export interface SummaryConfig {
+  kind: SummaryKind
+}
+
+export interface AlarmFeedConfig {
+  maxItems?: number
+  severity?: 'critical' | 'warning' | 'info' | 'all'
+}
+
+export interface FactoryMapConfig {
+  factoryId: number
+}
+
 // ── 위젯 본체 ──
 export interface Widget {
   id: string
@@ -64,6 +79,9 @@ export interface Widget {
     | CounterConfig
     | MiniBarConfig
     | HeatMapConfig
+    | SummaryConfig
+    | AlarmFeedConfig
+    | FactoryMapConfig
 }
 
 export interface DashboardLayout {
