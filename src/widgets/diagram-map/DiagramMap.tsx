@@ -29,6 +29,12 @@ export interface ZoneValue {
   riskLabel: string
 }
 
+export interface SensorMarker {
+  label: string
+  valueText: string
+  risk: 'normal' | 'caution' | 'warning' | 'danger' | 'offline'
+}
+
 interface Props {
   nodes: DiagramNode[]
   edges: DiagramEdge[]
@@ -41,6 +47,9 @@ interface Props {
   alarmStatusByDevice?: Record<string, 'critical' | 'warning'>
   selectedDeviceCode?: string | null
   backgroundImage?: { base64: string; width: number; height: number } | null
+  sensorMarkers?: Record<string, SensorMarker> // deviceCode → 실시간 값. 뷰 모드에서 심볼 대신 상태 칩 렌더
+  onMarkerClick?: (deviceCode: string) => void
+  onDeviceClick?: (deviceCode: string) => void // 뷰 모드에서 설비 연결 심볼 클릭 (마커 제외)
 }
 
 // ── 심볼 메타 ─────────────────────────────────────────────────────
@@ -70,6 +79,24 @@ const ZONE_RISK_HEX: Record<string, string> = {
   caution: '#eab308',
   warning: '#f97316',
   danger: '#ef4444',
+}
+
+const MARKER_STYLE: Record<
+  SensorMarker['risk'],
+  { stroke: string; fill: string; dot: string; label: string; value: string }
+> = {
+  normal: { stroke: '#10b981', fill: '#ffffff', dot: '#10b981', label: '#64748b', value: '#0f172a' },
+  caution: { stroke: '#eab308', fill: '#fefce8', dot: '#eab308', label: '#854d0e', value: '#713f12' },
+  warning: { stroke: '#f97316', fill: '#fff7ed', dot: '#f97316', label: '#9a3412', value: '#7c2d12' },
+  danger: { stroke: '#ef4444', fill: '#fef2f2', dot: '#ef4444', label: '#b91c1c', value: '#7f1d1d' },
+  offline: { stroke: '#94a3b8', fill: '#f8fafc', dot: '#94a3b8', label: '#94a3b8', value: '#64748b' },
+}
+
+// ponytail: 글자폭 근사치(ASCII 0.6em, 한글 1em) — 칩이 어긋나 보이면 Konva measureText로 교체
+function approxTextWidth(s: string, fontSize: number): number {
+  let w = 0
+  for (const ch of s) w += ch.charCodeAt(0) < 256 ? fontSize * 0.6 : fontSize
+  return w
 }
 
 export function getDefaultDims(type: PidSymbolType): { w: number; h: number } {
@@ -407,6 +434,9 @@ export function DiagramMap({
   alarmStatusByDevice,
   selectedDeviceCode,
   backgroundImage,
+  sensorMarkers,
+  onMarkerClick,
+  onDeviceClick,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [stageSize, setStageSize] = useState({ w: 800, h: 520 })
@@ -594,6 +624,13 @@ export function DiagramMap({
   function handleNodeClick(nodeId: string, e: KonvaEventObject<MouseEvent>) {
     e.cancelBubble = true
     if (tool === 'select' || !editMode) {
+      if (!editMode && onDeviceClick) {
+        const node = localNodes.find((n) => n.id === nodeId)
+        if (node?.deviceCode) {
+          onDeviceClick(node.deviceCode)
+          return
+        }
+      }
       setSelectedId(nodeId === selectedId ? null : nodeId)
       return
     }
@@ -940,7 +977,6 @@ export function DiagramMap({
                               : 0.04
                       }
                       cornerRadius={6}
-                      listening={false}
                     />
                     <Rect
                       x={0}
@@ -1048,6 +1084,97 @@ export function DiagramMap({
 
               {/* 심볼 노드 */}
               {symbolNodes.map((node) => {
+                const marker =
+                  !editMode && node.deviceCode ? sensorMarkers?.[node.deviceCode] : undefined
+                if (marker) {
+                  const st = MARKER_STYLE[marker.risk]
+                  // 마커는 역스케일로 화면 고정 크기 유지 — 축소해도 읽을 수 있게
+                  const inv = 1 / scale
+                  const abnormal =
+                    marker.risk === 'caution' ||
+                    marker.risk === 'warning' ||
+                    marker.risk === 'danger'
+                  // ponytail: 마커 LOD — 축소 상태에선 정상/단절은 점, 이상만 칩. 0.5배 이상 확대하면 전부 칩. 임계 조정은 여기.
+                  const showChip = abnormal || scale >= 0.5
+                  if (!showChip) {
+                    return (
+                      <Group
+                        key={node.id}
+                        x={node.x}
+                        y={node.y}
+                        scaleX={inv}
+                        scaleY={inv}
+                        opacity={marker.risk === 'offline' ? 0.55 : 1}
+                        onClick={(e) => {
+                          e.cancelBubble = true
+                          onMarkerClick?.(node.deviceCode!)
+                        }}
+                      >
+                        <Circle
+                          radius={4.5}
+                          fill={st.dot}
+                          stroke="#ffffff"
+                          strokeWidth={1.5}
+                          hitStrokeWidth={10}
+                        />
+                      </Group>
+                    )
+                  }
+                  const danger = marker.risk === 'danger'
+                  const labelFs = danger ? 12 : 11
+                  const valueFs = danger ? 14 : 12
+                  const h = danger ? 32 : 26
+                  const labelW = approxTextWidth(marker.label, labelFs)
+                  const valueW = approxTextWidth(marker.valueText, valueFs)
+                  const w = 20 + labelW + 7 + valueW + 12
+                  return (
+                    <Group
+                      key={node.id}
+                      x={node.x}
+                      y={node.y}
+                      scaleX={inv}
+                      scaleY={inv}
+                      offsetX={w / 2}
+                      offsetY={h / 2}
+                      opacity={marker.risk === 'offline' ? 0.75 : 1}
+                      onClick={(e) => {
+                        e.cancelBubble = true
+                        onMarkerClick?.(node.deviceCode!)
+                      }}
+                    >
+                      <Rect
+                        width={w}
+                        height={h}
+                        fill={st.fill}
+                        stroke={st.stroke}
+                        strokeWidth={danger ? 2.5 : 1.5}
+                        cornerRadius={h / 2}
+                        shadowColor={danger ? '#ef4444' : undefined}
+                        shadowBlur={danger ? 8 : 0}
+                        shadowOpacity={danger ? 0.5 : 0}
+                      />
+                      <Circle x={13} y={h / 2} radius={3.5} fill={st.dot} listening={false} />
+                      <Text
+                        x={20}
+                        y={(h - labelFs) / 2 - 1}
+                        text={marker.label}
+                        fontSize={labelFs}
+                        fill={st.label}
+                        listening={false}
+                      />
+                      <Text
+                        x={20 + labelW + 7}
+                        y={(h - valueFs) / 2 - 1}
+                        text={marker.valueText}
+                        fontSize={valueFs}
+                        fontStyle="bold"
+                        fill={st.value}
+                        listening={false}
+                      />
+                    </Group>
+                  )
+                }
+
                 const dims = nodeDims(node)
                 const color = nodeColor(node)
                 const isSel = selectedId === node.id

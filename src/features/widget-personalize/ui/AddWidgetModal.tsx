@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { api } from '@/shared/lib/api'
 import { listFactories } from '@/entities/factory/api/factoryApi'
 import type { Factory } from '@/entities/factory/model/types'
+import { listLines } from '@/entities/line/api/lineApi'
+import type { Line } from '@/entities/line/model/types'
 import type { Widget, WidgetType, SummaryKind } from '@/entities/widget/model/types'
+import { METRIC_LABELS } from '@/entities/widget/model/metricLabels'
 
 interface Props {
   onAdd: (widget: Omit<Widget, 'id'>) => void
@@ -26,24 +29,6 @@ interface EquipmentLiveDetail {
   equipmentType: string
   isActive: boolean
   latest: Record<string, unknown>
-}
-
-const METRIC_LABELS: Record<string, string> = {
-  temperature: '온도 (°C)',
-  humidity: '습도 (%)',
-  battery: '배터리 (%)',
-  rssi: 'RSSI (dBm)',
-  spindle_rpm: '스핀들 RPM',
-  spindle_load: '스핀들 부하 (%)',
-  vibration: '진동',
-  motor_temp: '모터 온도 (°C)',
-  cycle_time: '사이클 타임 (s)',
-  discharge_pressure: '토출압력 (bar)',
-  suction_temp: '흡입온도 (°C)',
-  discharge_temp: '토출온도 (°C)',
-  motor_current: '모터전류 (A)',
-  active_power: '유효전력 (kW)',
-  energy_kwh: '에너지 (kWh)',
 }
 
 const GAUGE_CONFIG: Record<string, { min: number; max: number; warningAt: number }> = {
@@ -76,6 +61,7 @@ const DEFAULT_SIZE: Record<WidgetType, { w: number; h: number }> = {
   summary: { w: 3, h: 2 },
   'alarm-feed': { w: 4, h: 4 },
   'factory-map': { w: 6, h: 5 },
+  'line-map': { w: 6, h: 5 },
 }
 
 const SUMMARY_KINDS: { value: SummaryKind; label: string }[] = [
@@ -86,12 +72,13 @@ const SUMMARY_KINDS: { value: SummaryKind; label: string }[] = [
   { value: 'comm-fault', label: '장애 / 통신단절' },
 ]
 
-const SOURCELESS_TYPES: WidgetType[] = ['summary', 'alarm-feed', 'factory-map']
+const SOURCELESS_TYPES: WidgetType[] = ['summary', 'alarm-feed', 'factory-map', 'line-map']
 
 const WIDGET_TYPES: { value: WidgetType; label: string; desc: string }[] = [
   { value: 'summary', label: '설비 요약 카드', desc: '전체/가동/유휴/알람 집계 수치' },
   { value: 'alarm-feed', label: '실시간 알람 피드', desc: '최신 알람 목록 실시간 표시' },
   { value: 'factory-map', label: '공장 도면 맵', desc: '공장 배치 이미지에 공정 핀 표시' },
+  { value: 'line-map', label: '라인 센서 맵', desc: '라인 도면에 센서 실시간 값 표시' },
   { value: 'gauge', label: '게이지', desc: '현재 값을 반원 계기판으로 표시' },
   { value: 'trend', label: '추이', desc: '시간에 따른 변화를 꺾은선으로 표시' },
   { value: 'stat', label: '수치 카드', desc: '큰 숫자 + 기간 평균 대비 변화율' },
@@ -121,6 +108,8 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
   const [summaryKind, setSummaryKind] = useState<SummaryKind>('total')
   const [factories, setFactories] = useState<Factory[]>([])
   const [selectedFactoryId, setSelectedFactoryId] = useState<number | null>(null)
+  const [lines, setLines] = useState<Line[]>([])
+  const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
 
   const isSourceless = SOURCELESS_TYPES.includes(widgetType)
 
@@ -137,7 +126,17 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
   // 공장 목록 로드 (factory-map 타입 선택 시)
   useEffect(() => {
     if (widgetType !== 'factory-map') return
-    listFactories().then(setFactories).catch(() => {})
+    listFactories()
+      .then(setFactories)
+      .catch(() => {})
+  }, [widgetType])
+
+  // 라인 목록 로드 (line-map 타입 선택 시)
+  useEffect(() => {
+    if (widgetType !== 'line-map') return
+    listLines()
+      .then(setLines)
+      .catch(() => {})
   }, [widgetType])
 
   // 설비 목록 초기 로드
@@ -206,7 +205,7 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
     if (!isSourceless && (!deviceCode || !metric)) return
 
     // 타입별 기본 config 생성
-    let config: any
+    let config: Widget['config']
     if (widgetType === 'summary') {
       config = { kind: summaryKind }
     } else if (widgetType === 'alarm-feed') {
@@ -214,6 +213,9 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
     } else if (widgetType === 'factory-map') {
       if (!selectedFactoryId) return
       config = { factoryId: selectedFactoryId }
+    } else if (widgetType === 'line-map') {
+      if (!selectedLineId) return
+      config = { lineId: selectedLineId }
     } else if (widgetType === 'gauge') {
       config = GAUGE_CONFIG[metric] ?? DEFAULT_GAUGE
     } else if (widgetType === 'trend') {
@@ -331,13 +333,18 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
           {/* summary 종류 선택 */}
           {widgetType === 'summary' && (
             <div>
-              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">집계 항목</label>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
+                집계 항목
+              </label>
               <div className="grid grid-cols-3 gap-2">
                 {SUMMARY_KINDS.map((k) => (
                   <button
                     key={k.value}
                     type="button"
-                    onClick={() => { setSummaryKind(k.value); setTitle(k.label) }}
+                    onClick={() => {
+                      setSummaryKind(k.value)
+                      setTitle(k.label)
+                    }}
                     className={[
                       'h-9 px-2 rounded-lg border-2 text-[12px] font-medium transition-all',
                       summaryKind === k.value
@@ -355,7 +362,9 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
           {/* factory-map 공장 선택 */}
           {widgetType === 'factory-map' && (
             <div>
-              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">공장 선택</label>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
+                공장 선택
+              </label>
               <select
                 value={selectedFactoryId ?? ''}
                 onChange={(e) => {
@@ -367,99 +376,136 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
                 required
                 className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer"
               >
-                <option value="" disabled>공장을 선택하세요</option>
+                <option value="" disabled>
+                  공장을 선택하세요
+                </option>
                 {factories.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* line-map 라인 선택 */}
+          {widgetType === 'line-map' && (
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
+                라인 선택
+              </label>
+              <select
+                value={selectedLineId ?? ''}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  setSelectedLineId(id)
+                  const l = lines.find((l) => l.id === id)
+                  if (l) setTitle(`${l.name} 센서 맵`)
+                }}
+                required
+                className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer"
+              >
+                <option value="" disabled>
+                  라인을 선택하세요
+                </option>
+                {lines.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
                 ))}
               </select>
             </div>
           )}
 
           {/* 설비 선택 (sourceless 타입은 숨김) */}
-          {!isSourceless && <div>
-            <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">설비</label>
-            {devicesLoading ? (
-              <div className="h-9 border border-slate-200 rounded-lg flex items-center px-3 gap-2 text-slate-400 text-[12px]">
-                <div className="w-3 h-3 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin" />
-                설비 목록 불러오는 중...
-              </div>
-            ) : (
-              <select
-                value={deviceCode}
-                onChange={(e) => handleDeviceChange(e.target.value)}
-                required
-                className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer"
-              >
-                <option value="" disabled>
-                  설비를 선택하세요
-                </option>
-                {Object.entries(deviceGroups).map(([type, group]) => (
-                  <optgroup key={type} label={TYPE_LABEL[type] ?? type}>
-                    {group.map((d) => (
-                      <option key={d.code} value={d.code} disabled={!d.hasData}>
-                        {d.name} ({d.code}){!d.hasData ? ' — 데이터 없음' : ''}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            )}
-
-            {/* 선택된 설비 상태 */}
-            {selectedDevice && (
-              <div className="mt-1.5 flex items-center gap-1.5">
-                <span
-                  className={[
-                    'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                    selectedDevice.hasData
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-slate-100 text-slate-500',
-                  ].join(' ')}
+          {!isSourceless && (
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">설비</label>
+              {devicesLoading ? (
+                <div className="h-9 border border-slate-200 rounded-lg flex items-center px-3 gap-2 text-slate-400 text-[12px]">
+                  <div className="w-3 h-3 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin" />
+                  설비 목록 불러오는 중...
+                </div>
+              ) : (
+                <select
+                  value={deviceCode}
+                  onChange={(e) => handleDeviceChange(e.target.value)}
+                  required
+                  className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer"
                 >
-                  {selectedDevice.hasData ? '● 데이터 있음' : '○ 데이터 없음'}
-                </span>
-                {selectedDevice.lastDataAt && (
-                  <span className="text-[11px] text-slate-400">
-                    마지막 수신: {new Date(selectedDevice.lastDataAt).toLocaleString('ko-KR')}
+                  <option value="" disabled>
+                    설비를 선택하세요
+                  </option>
+                  {Object.entries(deviceGroups).map(([type, group]) => (
+                    <optgroup key={type} label={TYPE_LABEL[type] ?? type}>
+                      {group.map((d) => (
+                        <option key={d.code} value={d.code} disabled={!d.hasData}>
+                          {d.name} ({d.code}){!d.hasData ? ' — 데이터 없음' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              )}
+
+              {/* 선택된 설비 상태 */}
+              {selectedDevice && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <span
+                    className={[
+                      'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                      selectedDevice.hasData
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-slate-100 text-slate-500',
+                    ].join(' ')}
+                  >
+                    {selectedDevice.hasData ? '● 데이터 있음' : '○ 데이터 없음'}
                   </span>
-                )}
-              </div>
-            )}
-          </div>}
+                  {selectedDevice.lastDataAt && (
+                    <span className="text-[11px] text-slate-400">
+                      마지막 수신: {new Date(selectedDevice.lastDataAt).toLocaleString('ko-KR')}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 측정 항목 (sourceless 타입은 숨김) */}
-          {!isSourceless && <div>
-            <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
-              측정 항목
-            </label>
-            {metricsLoading ? (
-              <div className="h-9 border border-slate-200 rounded-lg flex items-center px-3 gap-2 text-slate-400 text-[12px]">
-                <div className="w-3 h-3 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin" />
-                측정 항목 불러오는 중...
-              </div>
-            ) : (
-              <select
-                value={metric}
-                onChange={(e) => handleMetricChange(e.target.value)}
-                disabled={!deviceCode || metrics.length === 0}
-                required
-                className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="" disabled>
-                  {!deviceCode
-                    ? '설비를 먼저 선택하세요'
-                    : metrics.length === 0
-                      ? '측정 항목 없음'
-                      : '측정 항목을 선택하세요'}
-                </option>
-                {metrics.map((m) => (
-                  <option key={m} value={m}>
-                    {METRIC_LABELS[m] ?? m}
+          {!isSourceless && (
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
+                측정 항목
+              </label>
+              {metricsLoading ? (
+                <div className="h-9 border border-slate-200 rounded-lg flex items-center px-3 gap-2 text-slate-400 text-[12px]">
+                  <div className="w-3 h-3 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin" />
+                  측정 항목 불러오는 중...
+                </div>
+              ) : (
+                <select
+                  value={metric}
+                  onChange={(e) => handleMetricChange(e.target.value)}
+                  disabled={!deviceCode || metrics.length === 0}
+                  required
+                  className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="" disabled>
+                    {!deviceCode
+                      ? '설비를 먼저 선택하세요'
+                      : metrics.length === 0
+                        ? '측정 항목 없음'
+                        : '측정 항목을 선택하세요'}
                   </option>
-                ))}
-              </select>
-            )}
-          </div>}
+                  {metrics.map((m) => (
+                    <option key={m} value={m}>
+                      {METRIC_LABELS[m] ?? m}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           {/* 위젯 제목 */}
           <div>
@@ -468,7 +514,9 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
             </label>
             <input
               type="text"
-              placeholder={isSourceless ? '제목을 입력하세요' : '설비 + 측정 항목 선택 시 자동 입력됩니다'}
+              placeholder={
+                isSourceless ? '제목을 입력하세요' : '설비 + 측정 항목 선택 시 자동 입력됩니다'
+              }
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-[#003087] transition-colors"
@@ -490,6 +538,7 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
               disabled={
                 !title.trim() ||
                 (widgetType === 'factory-map' && !selectedFactoryId) ||
+                (widgetType === 'line-map' && !selectedLineId) ||
                 (!isSourceless && (!deviceCode || !metric))
               }
               className="flex-1 h-10 bg-[#003087] text-white rounded-xl text-[13px] font-semibold hover:bg-[#002470] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

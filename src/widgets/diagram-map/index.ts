@@ -1,2 +1,2 @@
 export { DiagramMap } from './DiagramMap'
-export type { EquipmentOption } from './DiagramMap'
+export type { EquipmentOption, SensorMarker } from './DiagramMap'

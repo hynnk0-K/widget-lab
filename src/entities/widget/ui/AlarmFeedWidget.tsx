@@ -45,7 +45,10 @@ export function AlarmFeedWidget({ widget }: { widget: Widget }) {
 
     load()
     const t = setInterval(load, POLL_MS)
-    return () => { active = false; clearInterval(t) }
+    return () => {
+      active = false
+      clearInterval(t)
+    }
   }, [maxItems, severity])
 
   return (
@@ -75,7 +78,9 @@ export function AlarmFeedWidget({ widget }: { widget: Widget }) {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${sev.dot}`} />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5 ${sev.dot}`}
+                      />
                       <span className="text-[12px] font-medium text-slate-700 truncate">
                         {alarm.deviceName}
                       </span>
@@ -87,7 +92,9 @@ export function AlarmFeedWidget({ widget }: { widget: Widget }) {
                       {timeAgo(alarm.occurredAt)}
                     </span>
                   </div>
-                  <p className="m-0 mt-0.5 ml-3 text-[11px] text-slate-500 truncate">{alarm.message}</p>
+                  <p className="m-0 mt-0.5 ml-3 text-[11px] text-slate-500 truncate">
+                    {alarm.message}
+                  </p>
                 </li>
               )
             })}

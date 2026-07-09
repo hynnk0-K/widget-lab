@@ -1,4 +1,15 @@
-export type WidgetType = 'gauge' | 'trend' | 'stat' | 'status' | 'counter' | 'minibar' | 'heatmap' | 'summary' | 'alarm-feed' | 'factory-map'
+export type WidgetType =
+  | 'gauge'
+  | 'trend'
+  | 'stat'
+  | 'status'
+  | 'counter'
+  | 'minibar'
+  | 'heatmap'
+  | 'summary'
+  | 'alarm-feed'
+  | 'factory-map'
+  | 'line-map'
 
 export interface WidgetSource {
   device: string
@@ -61,6 +72,10 @@ export interface FactoryMapConfig {
   factoryId: number
 }
 
+export interface LineMapConfig {
+  lineId: number
+}
+
 // ── 위젯 본체 ──
 export interface Widget {
   id: string
@@ -82,6 +97,7 @@ export interface Widget {
     | SummaryConfig
     | AlarmFeedConfig
     | FactoryMapConfig
+    | LineMapConfig
 }
 
 export interface DashboardLayout {

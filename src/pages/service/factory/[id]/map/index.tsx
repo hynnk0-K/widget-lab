@@ -11,7 +11,7 @@ export function FactoryMapPage() {
     factory, image, processes, loading, error,
     editMode, setEditMode,
     mode, selectMode,
-    diagram, pins,
+    diagram, equipmentOptions, pins,
     handleDiagramChange, handleImageUpload, handleImageDelete,
     handlePinMove, handlePinResize,
   } = useFactoryMap(factoryId)
@@ -102,6 +102,7 @@ export function FactoryMapPage() {
             edges={diagram.edges}
             editMode={editMode}
             backgroundImage={image}
+            equipmentOptions={equipmentOptions}
             zoneOptions={processes.map((p) => ({ id: p.id, name: p.name }))}
             onZoneClick={(id) => navigate(`/service/process/${id}/map`)}
             onChange={(nodes, edges) => handleDiagramChange({ nodes, edges })}

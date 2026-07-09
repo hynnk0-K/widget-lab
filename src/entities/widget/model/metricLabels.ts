@@ -1,0 +1,17 @@
+export const METRIC_LABELS: Record<string, string> = {
+  temperature: '온도 (°C)',
+  humidity: '습도 (%)',
+  battery: '배터리 (%)',
+  rssi: 'RSSI (dBm)',
+  spindle_rpm: '스핀들 RPM',
+  spindle_load: '스핀들 부하 (%)',
+  vibration: '진동',
+  motor_temp: '모터 온도 (°C)',
+  cycle_time: '사이클 타임 (s)',
+  discharge_pressure: '토출압력 (bar)',
+  suction_temp: '흡입온도 (°C)',
+  discharge_temp: '토출온도 (°C)',
+  motor_current: '모터전류 (A)',
+  active_power: '유효전력 (kW)',
+  energy_kwh: '에너지 (kWh)',
+}

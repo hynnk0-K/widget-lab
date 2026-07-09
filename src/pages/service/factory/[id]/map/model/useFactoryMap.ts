@@ -12,7 +12,10 @@ import { getFactory, getFactoryImage, putFactoryImage, deleteFactoryImage } from
 import type { Factory } from '@/entities/factory/model/types'
 import { listProcesses, updateProcess } from '@/entities/process/api/processApi'
 import type { Process } from '@/entities/process/model/types'
+import { listLines } from '@/entities/line/api/lineApi'
+import { listEquipments } from '@/entities/equipment/api/equipmentApi'
 import type { MapPin } from '@/widgets/layout-map'
+import type { EquipmentOption } from '@/widgets/diagram-map'
 
 export function useFactoryMap(factoryId: number) {
   const [factory, setFactory] = useState<Factory | null>(null)
@@ -23,6 +26,7 @@ export function useFactoryMap(factoryId: number) {
   const [editMode, setEditMode] = useState(false)
   const [mode, setMode] = useState<MapMode>(() => loadMapMode('factory', factoryId))
   const [diagram, setDiagram] = useState<DiagramData>({ nodes: [], edges: [] })
+  const [equipmentOptions, setEquipmentOptions] = useState<EquipmentOption[]>([])
   const saveDiagramTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const diagramRef = useRef(diagram)
   diagramRef.current = diagram
@@ -46,6 +50,14 @@ export function useFactoryMap(factoryId: number) {
           : null)
         setProcesses(processesData)
         setDiagram(diagramData)
+        // 공장 하위 전체 설비 → 도면 심볼의 설비 연결 옵션
+        Promise.all(processesData.map((p) => listLines(p.id)))
+          .then((liness) => Promise.all(liness.flat().map((l) => listEquipments(l.id))))
+          .then((eqss) => {
+            if (!active) return
+            setEquipmentOptions(eqss.flat().map((e) => ({ code: e.code, name: e.name })))
+          })
+          .catch(() => {})
       })
       .catch((err) => { if (!active) return; setError(err instanceof Error ? err.message : '데이터를 불러올 수 없습니다') })
       .finally(() => { if (active) setLoading(false) })
@@ -128,6 +140,7 @@ export function useFactoryMap(factoryId: number) {
     editMode, setEditMode,
     mode, selectMode,
     diagram,
+    equipmentOptions,
     pins,
     handleDiagramChange,
     handleImageUpload,
