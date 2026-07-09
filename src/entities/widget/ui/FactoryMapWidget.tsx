@@ -169,8 +169,8 @@ function DeviceChartsPanel({
         ) : charts.length === 0 ? (
           <p className="m-0 p-3 text-[11px] text-slate-400">표시할 측정 데이터가 없습니다</p>
         ) : (
-          charts.map((c) => (
-            <div key={c.label} className="px-3 pt-2.5 pb-1 border-b border-slate-50">
+          charts.map((c, i) => (
+            <div key={`${i}-${c.label}`} className="px-3 pt-2.5 pb-1 border-b border-slate-50">
               <div className="flex items-baseline justify-between">
                 <span className="text-[11px] text-slate-500">{c.label}</span>
                 <span className="text-[12px] font-bold text-[#003087]">

@@ -10,9 +10,16 @@ export type PidSymbolType =
   | 'tank'
   | 'pump'
   | 'motor'
+  | 'heat_exchanger'
+  | 'filter'
+  | 'compressor'
+  | 'conveyor'
+  | 'agitator'
   | 'generic'
   | 'zone' // 구역 레이블 (WBGT 등 오버레이용)
   | 'equipment' // 스크립트 자동 생성 설비 노드
+
+export type PortSide = 't' | 'r' | 'b' | 'l' // 노즐(포트) 위치
 
 export interface DiagramNode {
   id: string
@@ -36,6 +43,9 @@ export interface DiagramEdge {
   fromId: string
   toId: string
   edgeType: 'pipe' | 'signal'
+  medium?: string // 배관 매체 (PIPE_MEDIUM 키) — 없으면 기본 색
+  fromPort?: PortSide // 연결 노즐 — 없으면 자동(지배 축) 라우팅
+  toPort?: PortSide
 }
 
 export interface DiagramData {

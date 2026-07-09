@@ -11,7 +11,15 @@ import {
   Image as KonvaImage,
 } from 'react-konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
-import type { DiagramNode, DiagramEdge, PidSymbolType } from '@/shared/lib/diagramStorage'
+import type { Layer as KonvaLayer } from 'konva/lib/Layer'
+import type { Line as KonvaLine } from 'konva/lib/shapes/Line'
+import type { Shape as KonvaShape } from 'konva/lib/Shape'
+import type {
+  DiagramNode,
+  DiagramEdge,
+  PidSymbolType,
+  PortSide,
+} from '@/shared/lib/diagramStorage'
 
 export interface EquipmentOption {
   code: string
@@ -62,6 +70,11 @@ const SYMBOL_LABELS: Record<PidSymbolType, string> = {
   tank: '탱크',
   pump: '펌프',
   motor: '모터',
+  heat_exchanger: '열교환기',
+  filter: '여과기',
+  compressor: '압축기',
+  conveyor: '컨베이어',
+  agitator: '교반기',
   generic: '일반 장비',
   zone: '영역',
   equipment: '설비',
@@ -71,8 +84,31 @@ const SYMBOL_CATEGORIES: { label: string; types: PidSymbolType[] }[] = [
   { label: '영역', types: ['zone'] },
   { label: '밸브', types: ['valve_gate', 'valve_globe', 'valve_check', 'valve_ball'] },
   { label: '계기', types: ['instrument'] },
-  { label: '장비', types: ['tank', 'pump', 'motor', 'generic'] },
+  {
+    label: '장비',
+    types: [
+      'tank',
+      'pump',
+      'motor',
+      'heat_exchanger',
+      'filter',
+      'compressor',
+      'conveyor',
+      'agitator',
+      'generic',
+    ],
+  },
 ]
+
+// 배관 매체별 색/굵기 — DiagramEdge.medium 키
+export const PIPE_MEDIUM: Record<string, { label: string; color: string; width: number }> = {
+  default: { label: '기본', color: '#475569', width: 2 },
+  oil: { label: '절삭유/유류', color: '#f59e0b', width: 3 },
+  water: { label: '용수/폐수', color: '#0ea5e9', width: 3 },
+  chem: { label: '약품', color: '#8b5cf6', width: 2.5 },
+  gas: { label: 'LNG/가스', color: '#ef4444', width: 2.5 },
+  air: { label: '압축공기', color: '#10b981', width: 2 },
+}
 
 const ZONE_RISK_HEX: Record<string, string> = {
   safe: '#22c55e',
@@ -104,7 +140,39 @@ export function getDefaultDims(type: PidSymbolType): { w: number; h: number } {
   if (type === 'generic') return { w: 68, h: 36 }
   if (type === 'zone') return { w: 160, h: 100 }
   if (type === 'equipment') return { w: 36, h: 36 }
+  if (type === 'conveyor') return { w: 76, h: 24 }
+  if (type === 'filter') return { w: 34, h: 44 }
+  if (type === 'agitator') return { w: 40, h: 56 }
   return { w: 40, h: 40 }
+}
+
+// ── 포트(노즐) ────────────────────────────────────────────────────
+const PORT_DIR: Record<PortSide, { dx: number; dy: number }> = {
+  t: { dx: 0, dy: -1 },
+  r: { dx: 1, dy: 0 },
+  b: { dx: 0, dy: 1 },
+  l: { dx: -1, dy: 0 },
+}
+
+function portAnchor(node: DiagramNode, side: PortSide) {
+  const d = {
+    w: node.width ?? getDefaultDims(node.type).w,
+    h: node.height ?? getDefaultDims(node.type).h,
+  }
+  const dir = PORT_DIR[side]
+  return { x: node.x + (dir.dx * d.w) / 2, y: node.y + (dir.dy * d.h) / 2, ...dir }
+}
+
+// 클릭 지점에서 가장 가까운 포트 — 반폭/반높이로 정규화해 축 판정
+function nearestPort(node: DiagramNode, px: number, py: number): PortSide {
+  const d = {
+    w: node.width ?? getDefaultDims(node.type).w,
+    h: node.height ?? getDefaultDims(node.type).h,
+  }
+  const nx = (px - node.x) / (d.w / 2)
+  const ny = (py - node.y) / (d.h / 2)
+  if (Math.abs(nx) >= Math.abs(ny)) return nx >= 0 ? 'r' : 'l'
+  return ny >= 0 ? 'b' : 't'
 }
 
 // ── 팔레트 SVG 미리보기 ───────────────────────────────────────────
@@ -199,6 +267,52 @@ function SymbolSvg({ type }: { type: PidSymbolType }) {
         <svg width={32} height={32} viewBox="0 0 32 32">
           <rect x={2} y={2} width={28} height={28} rx={4} fill="none" stroke={c} strokeWidth={sw} />
           <circle cx={16} cy={16} r={4} fill={c} />
+        </svg>
+      )
+    case 'heat_exchanger':
+      return (
+        <svg width={32} height={32} viewBox="0 0 32 32">
+          <circle cx={16} cy={16} r={13} fill="none" stroke={c} strokeWidth={sw} />
+          <polyline
+            points="3,16 9,16 13,10 19,22 23,16 29,16"
+            fill="none"
+            stroke={c}
+            strokeWidth={sw}
+          />
+        </svg>
+      )
+    case 'filter':
+      return (
+        <svg width={26} height={34} viewBox="0 0 26 34">
+          <rect x={1} y={1} width={24} height={32} rx={3} fill="none" stroke={c} strokeWidth={sw} />
+          <line x1={1} y1={12} x2={25} y2={12} stroke={c} strokeWidth={1} strokeDasharray="3,2" />
+          <line x1={1} y1={22} x2={25} y2={22} stroke={c} strokeWidth={1} strokeDasharray="3,2" />
+        </svg>
+      )
+    case 'compressor':
+      return (
+        <svg width={32} height={32} viewBox="0 0 32 32">
+          <circle cx={16} cy={16} r={13} fill="none" stroke={c} strokeWidth={sw} />
+          <line x1={5} y1={10} x2={27} y2={14} stroke={c} strokeWidth={sw} />
+          <line x1={5} y1={22} x2={27} y2={18} stroke={c} strokeWidth={sw} />
+        </svg>
+      )
+    case 'conveyor':
+      return (
+        <svg width={40} height={16} viewBox="0 0 40 16">
+          <circle cx={8} cy={8} r={6} fill="none" stroke={c} strokeWidth={sw} />
+          <circle cx={32} cy={8} r={6} fill="none" stroke={c} strokeWidth={sw} />
+          <line x1={8} y1={2} x2={32} y2={2} stroke={c} strokeWidth={sw} />
+          <line x1={8} y1={14} x2={32} y2={14} stroke={c} strokeWidth={sw} />
+        </svg>
+      )
+    case 'agitator':
+      return (
+        <svg width={24} height={34} viewBox="0 0 24 34">
+          <rect x={7} y={1} width={10} height={7} fill="none" stroke={c} strokeWidth={sw} />
+          <line x1={12} y1={8} x2={12} y2={24} stroke={c} strokeWidth={sw} />
+          <line x1={4} y1={28} x2={12} y2={24} stroke={c} strokeWidth={sw} />
+          <line x1={20} y1={28} x2={12} y2={24} stroke={c} strokeWidth={sw} />
         </svg>
       )
     default: // generic
@@ -358,6 +472,61 @@ function Symbol({
           <Circle x={w / 2} y={h / 2} radius={4} fill={color} />
         </>
       )
+    case 'heat_exchanger':
+      return (
+        <>
+          <Circle x={cx} y={cy} radius={w * 0.42} stroke={color} strokeWidth={1.5} />
+          <Line
+            points={[0, cy, w * 0.28, cy, w * 0.4, cy - h * 0.2, w * 0.6, cy + h * 0.2, w * 0.72, cy, w, cy]}
+            stroke={color}
+            strokeWidth={1.5}
+          />
+        </>
+      )
+    case 'filter':
+      return (
+        <>
+          <Rect
+            x={1}
+            y={1}
+            width={w - 2}
+            height={h - 2}
+            stroke={color}
+            strokeWidth={1.5}
+            cornerRadius={3}
+          />
+          <Line points={[1, h * 0.36, w - 1, h * 0.36]} stroke={color} strokeWidth={1} dash={[3, 2]} />
+          <Line points={[1, h * 0.64, w - 1, h * 0.64]} stroke={color} strokeWidth={1} dash={[3, 2]} />
+        </>
+      )
+    case 'compressor':
+      return (
+        <>
+          <Circle x={cx} y={cy} radius={w * 0.42} stroke={color} strokeWidth={1.5} />
+          <Line points={[cx - w * 0.34, cy - h * 0.2, cx + w * 0.34, cy - h * 0.06]} stroke={color} strokeWidth={1.5} />
+          <Line points={[cx - w * 0.34, cy + h * 0.2, cx + w * 0.34, cy + h * 0.06]} stroke={color} strokeWidth={1.5} />
+        </>
+      )
+    case 'conveyor': {
+      const r = h / 2 - 1
+      return (
+        <>
+          <Circle x={r + 1} y={cy} radius={r} stroke={color} strokeWidth={1.5} />
+          <Circle x={w - r - 1} y={cy} radius={r} stroke={color} strokeWidth={1.5} />
+          <Line points={[r + 1, 1, w - r - 1, 1]} stroke={color} strokeWidth={1.5} />
+          <Line points={[r + 1, h - 1, w - r - 1, h - 1]} stroke={color} strokeWidth={1.5} />
+        </>
+      )
+    }
+    case 'agitator':
+      return (
+        <>
+          <Rect x={cx - w * 0.2} y={0} width={w * 0.4} height={h * 0.16} stroke={color} strokeWidth={1.5} />
+          <Line points={[cx, h * 0.16, cx, h * 0.72]} stroke={color} strokeWidth={1.5} />
+          <Line points={[cx - w * 0.36, h * 0.88, cx, h * 0.72]} stroke={color} strokeWidth={1.5} />
+          <Line points={[cx + w * 0.36, h * 0.88, cx, h * 0.72]} stroke={color} strokeWidth={1.5} />
+        </>
+      )
     default:
       return (
         <Rect
@@ -377,37 +546,58 @@ function NodeImage({ img, w, h }: { img: HTMLImageElement; w: number; h: number 
   return <KonvaImage image={img} x={0} y={0} width={w} height={h} cornerRadius={3} />
 }
 
-function calcEdgePoints(from: DiagramNode, to: DiagramNode): number[] {
+// 직교(Manhattan) 배관 라우팅 — 포트 지정 시 노즐에서 스텁으로 나간 뒤 직교 연결,
+// 미지정 시 지배 축 기준 ㄷ자(Z자) 자동 경로
+function calcEdgePoints(
+  from: DiagramNode,
+  to: DiagramNode,
+  fromPort?: PortSide,
+  toPort?: PortSide,
+): number[] {
+  if (fromPort && toPort) {
+    const a = portAnchor(from, fromPort)
+    const b = portAnchor(to, toPort)
+    const STUB = 14
+    const s1 = { x: a.x + a.dx * STUB, y: a.y + a.dy * STUB }
+    const s2 = { x: b.x + b.dx * STUB, y: b.y + b.dy * STUB }
+    const pts = [a.x, a.y, s1.x, s1.y]
+    if (Math.abs(s1.x - s2.x) < 0.5 || Math.abs(s1.y - s2.y) < 0.5) {
+      pts.push(s2.x, s2.y)
+    } else if (a.dx !== 0) {
+      const mx = (s1.x + s2.x) / 2
+      pts.push(mx, s1.y, mx, s2.y, s2.x, s2.y)
+    } else {
+      const my = (s1.y + s2.y) / 2
+      pts.push(s1.x, my, s2.x, my, s2.x, s2.y)
+    }
+    pts.push(b.x, b.y)
+    return pts
+  }
+
   const fd = {
     w: from.width ?? getDefaultDims(from.type).w,
     h: from.height ?? getDefaultDims(from.type).h,
   }
   const td = { w: to.width ?? getDefaultDims(to.type).w, h: to.height ?? getDefaultDims(to.type).h }
-  const fromA = [
-    { x: from.x, y: from.y - fd.h / 2 },
-    { x: from.x + fd.w / 2, y: from.y },
-    { x: from.x, y: from.y + fd.h / 2 },
-    { x: from.x - fd.w / 2, y: from.y },
-  ]
-  const toA = [
-    { x: to.x, y: to.y - td.h / 2 },
-    { x: to.x + td.w / 2, y: to.y },
-    { x: to.x, y: to.y + td.h / 2 },
-    { x: to.x - td.w / 2, y: to.y },
-  ]
-  let minD = Infinity,
-    fp = fromA[1],
-    tp = toA[3]
-  for (const fa of fromA)
-    for (const ta of toA) {
-      const d = Math.hypot(fa.x - ta.x, fa.y - ta.y)
-      if (d < minD) {
-        minD = d
-        fp = fa
-        tp = ta
-      }
-    }
-  return [fp.x, fp.y, tp.x, tp.y]
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    // 좌우로 나가서 좌우로 들어옴
+    const sx = Math.sign(dx || 1)
+    const fx = from.x + (sx * fd.w) / 2
+    const tx = to.x - (sx * td.w) / 2
+    if (Math.abs(dy) < 1) return [fx, from.y, tx, to.y]
+    const mx = (fx + tx) / 2
+    return [fx, from.y, mx, from.y, mx, to.y, tx, to.y]
+  }
+  // 상하로 나가서 상하로 들어옴
+  const sy = Math.sign(dy || 1)
+  const fy = from.y + (sy * fd.h) / 2
+  const ty = to.y - (sy * td.h) / 2
+  if (Math.abs(dx) < 1) return [from.x, fy, to.x, ty]
+  const my = (fy + ty) / 2
+  return [from.x, fy, from.x, my, to.x, my, to.x, ty]
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────
@@ -447,7 +637,7 @@ export function DiagramMap({
   const [localEdges, setLocalEdges] = useState<DiagramEdge[]>(edges)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [tool, setTool] = useState<'select' | 'pipe' | 'signal'>('select')
-  const [pendingFrom, setPendingFrom] = useState<string | null>(null)
+  const [pendingFrom, setPendingFrom] = useState<{ id: string; port: PortSide } | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [editing, setEditing] = useState<EditState | null>(null)
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
@@ -456,6 +646,30 @@ export function DiagramMap({
   )
   const [imgCache, setImgCache] = useState<Map<string, HTMLImageElement>>(new Map())
   const autoFittedRef = useRef(false)
+  const layerRef = useRef<KonvaLayer>(null)
+
+  // 배관 흐름 + 알람 점멸 애니메이션 — React 재렌더 없이 Konva 노드만 갱신 (rAF)
+  const hasPipes = localEdges.some((e) => e.edgeType === 'pipe')
+  const hasBlink =
+    !editMode &&
+    localNodes.some((n) => n.deviceCode && alarmStatusByDevice?.[n.deviceCode] === 'critical')
+  useEffect(() => {
+    if (!hasPipes && !hasBlink) return
+    let raf = 0
+    const tick = (t: number) => {
+      const layer = layerRef.current
+      if (layer) {
+        const off = -((t / 75) % 12)
+        for (const l of layer.find<KonvaLine>('.flow-dash')) l.dashOffset(off)
+        const op = 0.35 + 0.65 * Math.abs(Math.sin(t / 280))
+        for (const c of layer.find<KonvaShape>('.alarm-blink')) c.opacity(op)
+        layer.batchDraw()
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [hasPipes, hasBlink])
 
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -634,15 +848,27 @@ export function DiagramMap({
       setSelectedId(nodeId === selectedId ? null : nodeId)
       return
     }
+    // 배관/신호선 도구: 클릭 지점에서 가장 가까운 노즐(포트)에 스냅
+    const node = localNodes.find((n) => n.id === nodeId)
+    if (!node) return
+    const ptr = e.target.getStage()?.getRelativePointerPosition()
+    const port = ptr ? nearestPort(node, ptr.x, ptr.y) : 'r'
     if (!pendingFrom) {
-      setPendingFrom(nodeId)
+      setPendingFrom({ id: nodeId, port })
       return
     }
-    if (pendingFrom === nodeId) {
+    if (pendingFrom.id === nodeId) {
       setPendingFrom(null)
       return
     }
-    const edge: DiagramEdge = { id: `e${_id++}`, fromId: pendingFrom, toId: nodeId, edgeType: tool }
+    const edge: DiagramEdge = {
+      id: `e${_id++}`,
+      fromId: pendingFrom.id,
+      toId: nodeId,
+      edgeType: tool,
+      fromPort: pendingFrom.port,
+      toPort: port,
+    }
     const next = [...localEdges, edge]
     setLocalEdges(next)
     emit(localNodes, next)
@@ -788,7 +1014,7 @@ export function DiagramMap({
     const alarm = node.deviceCode ? alarmStatusByDevice?.[node.deviceCode] : undefined
     if (alarm === 'critical') return '#ef4444'
     if (alarm === 'warning') return '#f59e0b'
-    if (selectedId === node.id || pendingFrom === node.id) return '#3b82f6'
+    if (selectedId === node.id || pendingFrom?.id === node.id) return '#3b82f6'
     return '#334155'
   }
 
@@ -818,6 +1044,31 @@ export function DiagramMap({
               </button>
             ))}
           </div>
+
+          {(() => {
+            const selEdge = selectedId ? localEdges.find((e) => e.id === selectedId) : undefined
+            if (!selEdge || selEdge.edgeType !== 'pipe') return null
+            return (
+              <select
+                value={selEdge.medium ?? 'default'}
+                onChange={(e) => {
+                  const next = localEdges.map((ed) =>
+                    ed.id === selEdge.id ? { ...ed, medium: e.target.value } : ed,
+                  )
+                  setLocalEdges(next)
+                  emit(localNodes, next)
+                }}
+                className="h-8 px-2 text-[12px] border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:border-[#003087]"
+                title="배관 매체"
+              >
+                {Object.entries(PIPE_MEDIUM).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            )
+          })()}
 
           {selectedId && (
             <button
@@ -907,7 +1158,7 @@ export function DiagramMap({
             onMouseMove={handleMouseMove}
             onClick={handleStageClick}
           >
-            <Layer>
+            <Layer ref={layerRef}>
               <Rect
                 x={-5000}
                 y={-5000}
@@ -1047,40 +1298,56 @@ export function DiagramMap({
                 const from = nodesMap[edge.fromId],
                   to = nodesMap[edge.toId]
                 if (!from || !to) return null
-                const pts = calcEdgePoints(from, to)
+                const pts = calcEdgePoints(from, to, edge.fromPort, edge.toPort)
                 const isSel = selectedId === edge.id
                 const isPipe = edge.edgeType === 'pipe'
+                const med = PIPE_MEDIUM[edge.medium ?? 'default'] ?? PIPE_MEDIUM.default
+                const stroke = isSel ? '#3b82f6' : isPipe ? med.color : '#475569'
                 return (
-                  <Arrow
-                    key={edge.id}
-                    points={pts}
-                    stroke={isSel ? '#3b82f6' : '#475569'}
-                    strokeWidth={isPipe ? 2 : 1.5}
-                    dash={isPipe ? undefined : [7, 4]}
-                    fill={isSel ? '#3b82f6' : '#475569'}
-                    pointerLength={isPipe ? 9 : 0}
-                    pointerWidth={isPipe ? 6 : 0}
-                    hitStrokeWidth={14}
-                    onClick={(e) => handleEdgeClick(edge.id, e)}
-                  />
+                  <Group key={edge.id}>
+                    <Arrow
+                      points={pts}
+                      stroke={stroke}
+                      strokeWidth={isPipe ? med.width : 1.5}
+                      dash={isPipe ? undefined : [7, 4]}
+                      fill={stroke}
+                      pointerLength={isPipe ? 9 : 0}
+                      pointerWidth={isPipe ? 6 : 0}
+                      hitStrokeWidth={14}
+                      lineJoin="round"
+                      onClick={(e) => handleEdgeClick(edge.id, e)}
+                    />
+                    {isPipe && (
+                      <Line
+                        points={pts}
+                        stroke="#ffffff"
+                        strokeWidth={Math.max(1, med.width * 0.4)}
+                        dash={[7, 5]}
+                        name="flow-dash"
+                        opacity={0.85}
+                        lineJoin="round"
+                        listening={false}
+                      />
+                    )}
+                  </Group>
                 )
               })}
 
-              {pendingFrom && nodesMap[pendingFrom] && (
-                <Line
-                  points={[
-                    nodesMap[pendingFrom].x,
-                    nodesMap[pendingFrom].y,
-                    mousePos.x,
-                    mousePos.y,
-                  ]}
-                  stroke="#6366f1"
-                  strokeWidth={1.5}
-                  dash={tool === 'signal' ? [7, 4] : undefined}
-                  opacity={0.7}
-                  listening={false}
-                />
-              )}
+              {pendingFrom &&
+                nodesMap[pendingFrom.id] &&
+                (() => {
+                  const a = portAnchor(nodesMap[pendingFrom.id], pendingFrom.port)
+                  return (
+                    <Line
+                      points={[a.x, a.y, mousePos.x, mousePos.y]}
+                      stroke="#6366f1"
+                      strokeWidth={1.5}
+                      dash={tool === 'signal' ? [7, 4] : undefined}
+                      opacity={0.7}
+                      listening={false}
+                    />
+                  )
+                })()}
 
               {/* 심볼 노드 */}
               {symbolNodes.map((node) => {
@@ -1178,7 +1445,7 @@ export function DiagramMap({
                 const dims = nodeDims(node)
                 const color = nodeColor(node)
                 const isSel = selectedId === node.id
-                const isPending = pendingFrom === node.id
+                const isPending = pendingFrom?.id === node.id
                 const cachedImg = node.imageBase64 ? imgCache.get(node.imageBase64) : undefined
 
                 return (
@@ -1232,6 +1499,55 @@ export function DiagramMap({
                         label={node.type === 'instrument' ? (node.label ?? '') : undefined}
                       />
                     )}
+
+                    {/* 노즐(포트) — 배관/신호선 도구일 때 연결 지점 표시 */}
+                    {editMode && tool !== 'select' && (
+                      <>
+                        {(
+                          [
+                            [dims.w / 2, 0],
+                            [dims.w, dims.h / 2],
+                            [dims.w / 2, dims.h],
+                            [0, dims.h / 2],
+                          ] as const
+                        ).map(([px, py], i) => (
+                          <Circle
+                            key={i}
+                            x={px}
+                            y={py}
+                            radius={3}
+                            fill="#ffffff"
+                            stroke="#6366f1"
+                            strokeWidth={1.2}
+                            listening={false}
+                          />
+                        ))}
+                      </>
+                    )}
+
+                    {/* 알람 상태 점 — critical은 점멸 */}
+                    {!editMode &&
+                      node.deviceCode &&
+                      alarmStatusByDevice?.[node.deviceCode] && (
+                        <Circle
+                          x={dims.w}
+                          y={0}
+                          radius={4.5}
+                          fill={
+                            alarmStatusByDevice[node.deviceCode] === 'critical'
+                              ? '#ef4444'
+                              : '#f59e0b'
+                          }
+                          stroke="#ffffff"
+                          strokeWidth={1.2}
+                          name={
+                            alarmStatusByDevice[node.deviceCode] === 'critical'
+                              ? 'alarm-blink'
+                              : undefined
+                          }
+                          listening={false}
+                        />
+                      )}
 
                     {node.label && node.type !== 'instrument' && (
                       <Text
