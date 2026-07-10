@@ -4,21 +4,14 @@ import type { Line } from '@/entities/line/model/types'
 import { fetchAllLatest } from '@/entities/ehs/api/ehsApi'
 import type { EhsLatestRow } from '@/entities/ehs/api/ehsApi'
 import { CATEGORIES, calcRisk } from '@/entities/ehs/model/config'
-import { ENV_SLUGS, STALE_MS, fmtMetricValue } from '@/entities/ehs/model/envSensors'
+import { ENV_SLUGS, STALE_MS, fmtMetricValue, RISK_RANK } from '@/entities/ehs/model/envSensors'
 import type { DeviceRisk } from '@/entities/ehs/model/envSensors'
 import type { EhsCategoryConfig, EhsRiskLevel } from '@/entities/ehs/model/types'
 import { loadDiagram, type DiagramData } from '@/shared/lib/diagramStorage'
 import type { SensorMarker } from '@/widgets/diagram-map'
 
 export type { DeviceRisk }
-
-export const RISK_RANK: Record<DeviceRisk, number> = {
-  normal: 0,
-  offline: 1,
-  caution: 2,
-  warning: 3,
-  danger: 4,
-}
+export { RISK_RANK }
 
 export interface EnvDevice {
   code: string

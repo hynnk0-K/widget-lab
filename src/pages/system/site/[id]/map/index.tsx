@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { LayoutMap, type MapPin } from '@/widgets/layout-map'
+import { SiteIsoMap } from '@/widgets/site-iso-map'
 import { getSite, getSiteImage, putSiteImage, deleteSiteImage } from '@/entities/site/api/siteApi'
 import type { Site } from '@/entities/site/model/types'
 import { listFactories } from '@/entities/factory/api/factoryApi'
+import { useSiteFactoryStatus } from './model/useSiteFactoryStatus'
 
 export function SiteMapPage() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +18,10 @@ export function SiteMapPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
+  const [view, setView] = useState<'iso' | 'image'>('iso')
+
+  const factoryIds = useMemo(() => factories.map((f) => f.id), [factories])
+  const factoryStatus = useSiteFactoryStatus(factoryIds)
 
   useEffect(() => {
     if (!siteId || Number.isNaN(siteId)) return
@@ -123,45 +129,77 @@ export function SiteMapPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {editMode ? (
+          <div className="flex border border-slate-200 rounded-lg overflow-hidden text-[12px]">
             <button
-              onClick={() => setEditMode(false)}
-              className="h-8 px-4 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors"
+              onClick={() => setView('iso')}
+              className={`h-8 px-3 transition-colors ${
+                view === 'iso' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
             >
-              편집 종료
+              입체 배치도
             </button>
-          ) : (
             <button
-              onClick={() => setEditMode(true)}
-              className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+              onClick={() => setView('image')}
+              className={`h-8 px-3 border-l border-slate-200 transition-colors ${
+                view === 'image' ? 'bg-[#003087] text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+              }`}
             >
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                viewBox="0 0 16 16"
-                stroke="currentColor"
-                strokeWidth={2}
+              이미지 도면
+            </button>
+          </div>
+
+          {view === 'image' &&
+            (editMode ? (
+              <button
+                onClick={() => setEditMode(false)}
+                className="h-8 px-4 bg-[#003087] text-white text-[13px] font-medium rounded-lg hover:bg-[#002470] transition-colors"
               >
-                <path
-                  d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              도면 편집
-            </button>
-          )}
+                편집 종료
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditMode(true)}
+                className="h-8 px-4 border border-slate-200 text-slate-600 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  viewBox="0 0 16 16"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12L5 13.25 2 14l.75-3L11.5 2.5z"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                도면 편집
+              </button>
+            ))}
         </div>
       </div>
 
-      <LayoutMap
-        image={image}
-        pins={pins}
-        editMode={editMode}
-        onImageUpload={handleImageUpload}
-        onImageDelete={handleImageDelete}
-        onPinClick={handlePinClick}
-      />
+      {view === 'iso' ? (
+        <SiteIsoMap
+          factories={factories.map((f) => ({
+            id: f.id,
+            name: f.name,
+            deviceCount: factoryStatus[f.id]?.deviceCount ?? 0,
+            risk: factoryStatus[f.id]?.risk ?? 'normal',
+          }))}
+          onFactoryClick={(fid) => navigate(`/service/factory/${fid}/map`)}
+        />
+      ) : (
+        <LayoutMap
+          image={image}
+          pins={pins}
+          editMode={editMode}
+          onImageUpload={handleImageUpload}
+          onImageDelete={handleImageDelete}
+          onPinClick={handlePinClick}
+        />
+      )}
     </div>
   )
 }

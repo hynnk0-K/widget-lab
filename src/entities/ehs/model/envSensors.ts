@@ -16,6 +16,15 @@ export const ENV_SLUGS = [
 
 export type DeviceRisk = EhsRiskLevel | 'offline'
 
+// 위험도 심각도 순위 — 집계 시 최악 등급 계산용
+export const RISK_RANK: Record<DeviceRisk, number> = {
+  normal: 0,
+  offline: 1,
+  caution: 2,
+  warning: 3,
+  danger: 4,
+}
+
 export const STALE_MS = 2 * 60_000 // 마지막 수신 2분 초과 시 통신단절 처리
 
 export function fmtMetricValue(v: number, unit: string): string {
