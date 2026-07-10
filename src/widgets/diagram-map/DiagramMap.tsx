@@ -547,13 +547,32 @@ function NodeImage({ img, w, h }: { img: HTMLImageElement; w: number; h: number 
 }
 
 // 직교(Manhattan) 배관 라우팅 — 포트 지정 시 노즐에서 스텁으로 나간 뒤 직교 연결,
-// 미지정 시 지배 축 기준 ㄷ자(Z자) 자동 경로
+// 미지정 시 지배 축 기준 ㄷ자(Z자) 자동 경로, 경유점 지정 시 경유점 통과
 function calcEdgePoints(
   from: DiagramNode,
   to: DiagramNode,
-  fromPort?: PortSide,
-  toPort?: PortSide,
+  edge?: Pick<DiagramEdge, 'fromPort' | 'toPort' | 'waypoints'>,
 ): number[] {
+  const wps = edge?.waypoints ?? []
+  const fromPort = edge?.fromPort
+  const toPort = edge?.toPort
+
+  if (wps.length > 0) {
+    // 경유점 경로: 앵커는 다음/이전 지점을 향한 포트, 각 구간은 수평 우선 L자
+    // ponytail: 수평 우선 고정 규칙 — 세로 우선이 필요하면 경유점을 하나 더 찍으면 됨
+    const a = portAnchor(from, fromPort ?? nearestPort(from, wps[0].x, wps[0].y))
+    const last = wps[wps.length - 1]
+    const b = portAnchor(to, toPort ?? nearestPort(to, last.x, last.y))
+    const pts = [a.x, a.y]
+    let cur = { x: a.x, y: a.y }
+    for (const p of [...wps, { x: b.x, y: b.y }]) {
+      if (Math.abs(cur.x - p.x) > 0.5 && Math.abs(cur.y - p.y) > 0.5) pts.push(p.x, cur.y)
+      pts.push(p.x, p.y)
+      cur = p
+    }
+    return pts
+  }
+
   if (fromPort && toPort) {
     const a = portAnchor(from, fromPort)
     const b = portAnchor(to, toPort)
@@ -598,6 +617,23 @@ function calcEdgePoints(
   if (Math.abs(dx) < 1) return [from.x, fy, to.x, ty]
   const my = (fy + ty) / 2
   return [from.x, fy, from.x, my, to.x, my, to.x, ty]
+}
+
+// 폴리라인 길이 기준 중앙점 — 배관 라벨 위치용
+function polylineMidpoint(pts: number[]): { x: number; y: number } {
+  let total = 0
+  for (let i = 0; i + 3 < pts.length; i += 2)
+    total += Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1])
+  let walk = total / 2
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    const seg = Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1])
+    if (walk <= seg && seg > 0) {
+      const t = walk / seg
+      return { x: pts[i] + (pts[i + 2] - pts[i]) * t, y: pts[i + 1] + (pts[i + 3] - pts[i + 1]) * t }
+    }
+    walk -= seg
+  }
+  return { x: pts[0] ?? 0, y: pts[1] ?? 0 }
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────
@@ -921,6 +957,41 @@ export function DiagramMap({
     setSelectedId(edgeId)
   }
 
+  // 편집 모드에서 배관 더블클릭 → 클릭 지점에 경유점 삽입
+  // ponytail: 삽입 인덱스는 경로 길이 증가 최소 지점 — 경유점 수가 적어 O(n²)도 충분
+  function handleEdgeDblClick(edgeId: string, e: KonvaEventObject<MouseEvent>) {
+    if (!editMode || tool !== 'select') return
+    e.cancelBubble = true
+    const edge = localEdges.find((ed) => ed.id === edgeId)
+    const from = edge && nodesMap[edge.fromId]
+    const to = edge && nodesMap[edge.toId]
+    const pos = e.target.getStage()?.getRelativePointerPosition()
+    if (!edge || !from || !to || !pos) return
+    const wp = { x: Math.round(pos.x), y: Math.round(pos.y) }
+    const seq = [{ x: from.x, y: from.y }, ...(edge.waypoints ?? []), { x: to.x, y: to.y }]
+    const lenWith = (k: number) => {
+      const s = [...seq.slice(0, k + 1), wp, ...seq.slice(k + 1)]
+      let len = 0
+      for (let i = 0; i + 1 < s.length; i++) len += Math.hypot(s[i + 1].x - s[i].x, s[i + 1].y - s[i].y)
+      return len
+    }
+    let best = 0
+    let bestLen = Infinity
+    for (let k = 0; k <= (edge.waypoints?.length ?? 0); k++) {
+      const len = lenWith(k)
+      if (len < bestLen) {
+        bestLen = len
+        best = k
+      }
+    }
+    const wps = [...(edge.waypoints ?? [])]
+    wps.splice(best, 0, wp)
+    const next = localEdges.map((ed) => (ed.id === edgeId ? { ...ed, waypoints: wps } : ed))
+    setLocalEdges(next)
+    emit(localNodes, next)
+    setSelectedId(edgeId)
+  }
+
   function quickAddNode(type: PidSymbolType) {
     const el = containerRef.current
     if (!el) return
@@ -1047,26 +1118,36 @@ export function DiagramMap({
 
           {(() => {
             const selEdge = selectedId ? localEdges.find((e) => e.id === selectedId) : undefined
-            if (!selEdge || selEdge.edgeType !== 'pipe') return null
+            if (!selEdge) return null
+            const patch = (p: Partial<DiagramEdge>) => {
+              const next = localEdges.map((ed) => (ed.id === selEdge.id ? { ...ed, ...p } : ed))
+              setLocalEdges(next)
+              emit(localNodes, next)
+            }
             return (
-              <select
-                value={selEdge.medium ?? 'default'}
-                onChange={(e) => {
-                  const next = localEdges.map((ed) =>
-                    ed.id === selEdge.id ? { ...ed, medium: e.target.value } : ed,
-                  )
-                  setLocalEdges(next)
-                  emit(localNodes, next)
-                }}
-                className="h-8 px-2 text-[12px] border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:border-[#003087]"
-                title="배관 매체"
-              >
-                {Object.entries(PIPE_MEDIUM).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
+              <>
+                {selEdge.edgeType === 'pipe' && (
+                  <select
+                    value={selEdge.medium ?? 'default'}
+                    onChange={(e) => patch({ medium: e.target.value })}
+                    className="h-8 px-2 text-[12px] border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:border-[#003087]"
+                    title="배관 매체"
+                  >
+                    {Object.entries(PIPE_MEDIUM).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  value={selEdge.label ?? ''}
+                  onChange={(e) => patch({ label: e.target.value || undefined })}
+                  placeholder="배관 라벨 (예: 절삭유 2″)"
+                  className="h-8 px-2 w-36 text-[12px] border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:border-[#003087]"
+                />
+                <span className="text-[10px] text-slate-400">더블클릭: 경유점 추가/삭제</span>
+              </>
             )
           })()}
 
@@ -1298,11 +1379,13 @@ export function DiagramMap({
                 const from = nodesMap[edge.fromId],
                   to = nodesMap[edge.toId]
                 if (!from || !to) return null
-                const pts = calcEdgePoints(from, to, edge.fromPort, edge.toPort)
+                const pts = calcEdgePoints(from, to, edge)
                 const isSel = selectedId === edge.id
                 const isPipe = edge.edgeType === 'pipe'
                 const med = PIPE_MEDIUM[edge.medium ?? 'default'] ?? PIPE_MEDIUM.default
                 const stroke = isSel ? '#3b82f6' : isPipe ? med.color : '#475569'
+                const mid = edge.label ? polylineMidpoint(pts) : null
+                const labelW = edge.label ? approxTextWidth(edge.label, 10) : 0
                 return (
                   <Group key={edge.id}>
                     <Arrow
@@ -1316,6 +1399,7 @@ export function DiagramMap({
                       hitStrokeWidth={14}
                       lineJoin="round"
                       onClick={(e) => handleEdgeClick(edge.id, e)}
+                      onDblClick={(e) => handleEdgeDblClick(edge.id, e)}
                     />
                     {isPipe && (
                       <Line
@@ -1329,9 +1413,72 @@ export function DiagramMap({
                         listening={false}
                       />
                     )}
+                    {edge.label && mid && (
+                      <Group x={mid.x} y={mid.y} listening={false}>
+                        <Rect
+                          x={-labelW / 2 - 4}
+                          y={-8}
+                          width={labelW + 8}
+                          height={16}
+                          fill="#ffffff"
+                          stroke={med.color}
+                          strokeWidth={0.8}
+                          cornerRadius={3}
+                          opacity={0.92}
+                        />
+                        <Text
+                          x={-labelW / 2}
+                          y={-5}
+                          text={edge.label}
+                          fontSize={10}
+                          fill="#334155"
+                        />
+                      </Group>
+                    )}
                   </Group>
                 )
               })}
+
+              {/* 선택된 엣지의 경유점 핸들 — 드래그 이동, 더블클릭 삭제 */}
+              {editMode &&
+                tool === 'select' &&
+                (() => {
+                  const edge = localEdges.find((ed) => ed.id === selectedId)
+                  if (!edge?.waypoints?.length) return null
+                  return edge.waypoints.map((wp, i) => (
+                    <Circle
+                      key={`wp-${edge.id}-${i}`}
+                      x={wp.x}
+                      y={wp.y}
+                      radius={5}
+                      fill="#ffffff"
+                      stroke="#3b82f6"
+                      strokeWidth={1.5}
+                      draggable
+                      onDragEnd={(e) => {
+                        const wps = edge.waypoints!.map((w, j) =>
+                          j === i ? { x: Math.round(e.target.x()), y: Math.round(e.target.y()) } : w,
+                        )
+                        const next = localEdges.map((ed) =>
+                          ed.id === edge.id ? { ...ed, waypoints: wps } : ed,
+                        )
+                        setLocalEdges(next)
+                        emit(localNodes, next)
+                      }}
+                      onDblClick={(e) => {
+                        e.cancelBubble = true
+                        const wps = edge.waypoints!.filter((_, j) => j !== i)
+                        const next = localEdges.map((ed) =>
+                          ed.id === edge.id
+                            ? { ...ed, waypoints: wps.length ? wps : undefined }
+                            : ed,
+                        )
+                        setLocalEdges(next)
+                        emit(localNodes, next)
+                      }}
+                    />
+                  ))
+                })()}
 
               {pendingFrom &&
                 nodesMap[pendingFrom.id] &&
@@ -1580,6 +1727,79 @@ export function DiagramMap({
               })}
             </Layer>
           </Stage>
+
+          {/* 미니맵 — 클릭한 지점을 화면 중앙으로 */}
+          {localNodes.length > 0 &&
+            (() => {
+              const MW = 148
+              const MH = 92
+              let minX = Infinity,
+                minY = Infinity,
+                maxX = -Infinity,
+                maxY = -Infinity
+              for (const n of localNodes) {
+                const d = nodeDims(n)
+                minX = Math.min(minX, n.x - d.w / 2)
+                minY = Math.min(minY, n.y - d.h / 2)
+                maxX = Math.max(maxX, n.x + d.w / 2)
+                maxY = Math.max(maxY, n.y + d.h / 2)
+              }
+              const pad = 40
+              minX -= pad
+              minY -= pad
+              maxX += pad
+              maxY += pad
+              const s = Math.min(MW / (maxX - minX), MH / (maxY - minY))
+              const ox = (MW - (maxX - minX) * s) / 2 - minX * s
+              const oy = (MH - (maxY - minY) * s) / 2 - minY * s
+              // 현재 뷰포트 (stage 좌표계)
+              const vx = (-stagePos.x / scale) * s + ox
+              const vy = (-stagePos.y / scale) * s + oy
+              const vw = (stageSize.w / scale) * s
+              const vh = (stageSize.h / scale) * s
+              return (
+                <svg
+                  width={MW}
+                  height={MH}
+                  className="absolute bottom-2 left-2 bg-white/90 border border-slate-200 rounded cursor-pointer"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    const sx = (e.clientX - rect.left - ox) / s
+                    const sy = (e.clientY - rect.top - oy) / s
+                    setStagePos({ x: stageSize.w / 2 - sx * scale, y: stageSize.h / 2 - sy * scale })
+                  }}
+                >
+                  {localNodes.map((n) => {
+                    const d = nodeDims(n)
+                    const isZone = n.type === 'zone'
+                    return (
+                      <rect
+                        key={n.id}
+                        x={(n.x - d.w / 2) * s + ox}
+                        y={(n.y - d.h / 2) * s + oy}
+                        width={Math.max(2, d.w * s)}
+                        height={Math.max(2, d.h * s)}
+                        fill={isZone ? 'none' : '#64748b'}
+                        stroke={isZone ? '#94a3b8' : 'none'}
+                        strokeWidth={0.8}
+                        strokeDasharray={isZone ? '2,1.5' : undefined}
+                        rx={1}
+                      />
+                    )
+                  })}
+                  <rect
+                    x={vx}
+                    y={vy}
+                    width={vw}
+                    height={vh}
+                    fill="rgba(59,130,246,0.08)"
+                    stroke="#3b82f6"
+                    strokeWidth={1}
+                    rx={2}
+                  />
+                </svg>
+              )
+            })()}
 
           <div className="absolute bottom-2 right-2 flex items-center gap-1.5">
             <button

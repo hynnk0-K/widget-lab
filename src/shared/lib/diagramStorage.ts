@@ -46,6 +46,8 @@ export interface DiagramEdge {
   medium?: string // 배관 매체 (PIPE_MEDIUM 키) — 없으면 기본 색
   fromPort?: PortSide // 연결 노즐 — 없으면 자동(지배 축) 라우팅
   toPort?: PortSide
+  waypoints?: { x: number; y: number }[] // 수동 경유점 — 편집 모드에서 배관 더블클릭으로 추가
+  label?: string // 배관 라벨 (유량 태그 등) — 경로 중앙에 표시
 }
 
 export interface DiagramData {
