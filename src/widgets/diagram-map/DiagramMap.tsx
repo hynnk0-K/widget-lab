@@ -14,12 +14,7 @@ import type { KonvaEventObject } from 'konva/lib/Node'
 import type { Layer as KonvaLayer } from 'konva/lib/Layer'
 import type { Line as KonvaLine } from 'konva/lib/shapes/Line'
 import type { Shape as KonvaShape } from 'konva/lib/Shape'
-import type {
-  DiagramNode,
-  DiagramEdge,
-  PidSymbolType,
-  PortSide,
-} from '@/shared/lib/diagramStorage'
+import type { DiagramNode, DiagramEdge, PidSymbolType, PortSide } from '@/shared/lib/diagramStorage'
 
 export interface EquipmentOption {
   code: string
@@ -121,11 +116,41 @@ const MARKER_STYLE: Record<
   SensorMarker['risk'],
   { stroke: string; fill: string; dot: string; label: string; value: string }
 > = {
-  normal: { stroke: '#10b981', fill: '#ffffff', dot: '#10b981', label: '#64748b', value: '#0f172a' },
-  caution: { stroke: '#eab308', fill: '#fefce8', dot: '#eab308', label: '#854d0e', value: '#713f12' },
-  warning: { stroke: '#f97316', fill: '#fff7ed', dot: '#f97316', label: '#9a3412', value: '#7c2d12' },
-  danger: { stroke: '#ef4444', fill: '#fef2f2', dot: '#ef4444', label: '#b91c1c', value: '#7f1d1d' },
-  offline: { stroke: '#94a3b8', fill: '#f8fafc', dot: '#94a3b8', label: '#94a3b8', value: '#64748b' },
+  normal: {
+    stroke: '#10b981',
+    fill: '#ffffff',
+    dot: '#10b981',
+    label: '#64748b',
+    value: '#0f172a',
+  },
+  caution: {
+    stroke: '#eab308',
+    fill: '#fefce8',
+    dot: '#eab308',
+    label: '#854d0e',
+    value: '#713f12',
+  },
+  warning: {
+    stroke: '#f97316',
+    fill: '#fff7ed',
+    dot: '#f97316',
+    label: '#9a3412',
+    value: '#7c2d12',
+  },
+  danger: {
+    stroke: '#ef4444',
+    fill: '#fef2f2',
+    dot: '#ef4444',
+    label: '#b91c1c',
+    value: '#7f1d1d',
+  },
+  offline: {
+    stroke: '#94a3b8',
+    fill: '#f8fafc',
+    dot: '#94a3b8',
+    label: '#94a3b8',
+    value: '#64748b',
+  },
 }
 
 // ponytail: 글자폭 근사치(ASCII 0.6em, 한글 1em) — 칩이 어긋나 보이면 Konva measureText로 교체
@@ -477,7 +502,20 @@ function Symbol({
         <>
           <Circle x={cx} y={cy} radius={w * 0.42} stroke={color} strokeWidth={1.5} />
           <Line
-            points={[0, cy, w * 0.28, cy, w * 0.4, cy - h * 0.2, w * 0.6, cy + h * 0.2, w * 0.72, cy, w, cy]}
+            points={[
+              0,
+              cy,
+              w * 0.28,
+              cy,
+              w * 0.4,
+              cy - h * 0.2,
+              w * 0.6,
+              cy + h * 0.2,
+              w * 0.72,
+              cy,
+              w,
+              cy,
+            ]}
             stroke={color}
             strokeWidth={1.5}
           />
@@ -495,16 +533,34 @@ function Symbol({
             strokeWidth={1.5}
             cornerRadius={3}
           />
-          <Line points={[1, h * 0.36, w - 1, h * 0.36]} stroke={color} strokeWidth={1} dash={[3, 2]} />
-          <Line points={[1, h * 0.64, w - 1, h * 0.64]} stroke={color} strokeWidth={1} dash={[3, 2]} />
+          <Line
+            points={[1, h * 0.36, w - 1, h * 0.36]}
+            stroke={color}
+            strokeWidth={1}
+            dash={[3, 2]}
+          />
+          <Line
+            points={[1, h * 0.64, w - 1, h * 0.64]}
+            stroke={color}
+            strokeWidth={1}
+            dash={[3, 2]}
+          />
         </>
       )
     case 'compressor':
       return (
         <>
           <Circle x={cx} y={cy} radius={w * 0.42} stroke={color} strokeWidth={1.5} />
-          <Line points={[cx - w * 0.34, cy - h * 0.2, cx + w * 0.34, cy - h * 0.06]} stroke={color} strokeWidth={1.5} />
-          <Line points={[cx - w * 0.34, cy + h * 0.2, cx + w * 0.34, cy + h * 0.06]} stroke={color} strokeWidth={1.5} />
+          <Line
+            points={[cx - w * 0.34, cy - h * 0.2, cx + w * 0.34, cy - h * 0.06]}
+            stroke={color}
+            strokeWidth={1.5}
+          />
+          <Line
+            points={[cx - w * 0.34, cy + h * 0.2, cx + w * 0.34, cy + h * 0.06]}
+            stroke={color}
+            strokeWidth={1.5}
+          />
         </>
       )
     case 'conveyor': {
@@ -521,7 +577,14 @@ function Symbol({
     case 'agitator':
       return (
         <>
-          <Rect x={cx - w * 0.2} y={0} width={w * 0.4} height={h * 0.16} stroke={color} strokeWidth={1.5} />
+          <Rect
+            x={cx - w * 0.2}
+            y={0}
+            width={w * 0.4}
+            height={h * 0.16}
+            stroke={color}
+            strokeWidth={1.5}
+          />
           <Line points={[cx, h * 0.16, cx, h * 0.72]} stroke={color} strokeWidth={1.5} />
           <Line points={[cx - w * 0.36, h * 0.88, cx, h * 0.72]} stroke={color} strokeWidth={1.5} />
           <Line points={[cx + w * 0.36, h * 0.88, cx, h * 0.72]} stroke={color} strokeWidth={1.5} />
@@ -629,7 +692,10 @@ function polylineMidpoint(pts: number[]): { x: number; y: number } {
     const seg = Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1])
     if (walk <= seg && seg > 0) {
       const t = walk / seg
-      return { x: pts[i] + (pts[i + 2] - pts[i]) * t, y: pts[i + 1] + (pts[i + 3] - pts[i + 1]) * t }
+      return {
+        x: pts[i] + (pts[i + 2] - pts[i]) * t,
+        y: pts[i + 1] + (pts[i + 3] - pts[i + 1]) * t,
+      }
     }
     walk -= seg
   }
@@ -972,7 +1038,8 @@ export function DiagramMap({
     const lenWith = (k: number) => {
       const s = [...seq.slice(0, k + 1), wp, ...seq.slice(k + 1)]
       let len = 0
-      for (let i = 0; i + 1 < s.length; i++) len += Math.hypot(s[i + 1].x - s[i].x, s[i + 1].y - s[i].y)
+      for (let i = 0; i + 1 < s.length; i++)
+        len += Math.hypot(s[i + 1].x - s[i].x, s[i + 1].y - s[i].y)
       return len
     }
     let best = 0
@@ -1457,7 +1524,9 @@ export function DiagramMap({
                       draggable
                       onDragEnd={(e) => {
                         const wps = edge.waypoints!.map((w, j) =>
-                          j === i ? { x: Math.round(e.target.x()), y: Math.round(e.target.y()) } : w,
+                          j === i
+                            ? { x: Math.round(e.target.x()), y: Math.round(e.target.y()) }
+                            : w,
                         )
                         const next = localEdges.map((ed) =>
                           ed.id === edge.id ? { ...ed, waypoints: wps } : ed,
@@ -1673,28 +1742,26 @@ export function DiagramMap({
                     )}
 
                     {/* 알람 상태 점 — critical은 점멸 */}
-                    {!editMode &&
-                      node.deviceCode &&
-                      alarmStatusByDevice?.[node.deviceCode] && (
-                        <Circle
-                          x={dims.w}
-                          y={0}
-                          radius={4.5}
-                          fill={
-                            alarmStatusByDevice[node.deviceCode] === 'critical'
-                              ? '#ef4444'
-                              : '#f59e0b'
-                          }
-                          stroke="#ffffff"
-                          strokeWidth={1.2}
-                          name={
-                            alarmStatusByDevice[node.deviceCode] === 'critical'
-                              ? 'alarm-blink'
-                              : undefined
-                          }
-                          listening={false}
-                        />
-                      )}
+                    {!editMode && node.deviceCode && alarmStatusByDevice?.[node.deviceCode] && (
+                      <Circle
+                        x={dims.w}
+                        y={0}
+                        radius={4.5}
+                        fill={
+                          alarmStatusByDevice[node.deviceCode] === 'critical'
+                            ? '#ef4444'
+                            : '#f59e0b'
+                        }
+                        stroke="#ffffff"
+                        strokeWidth={1.2}
+                        name={
+                          alarmStatusByDevice[node.deviceCode] === 'critical'
+                            ? 'alarm-blink'
+                            : undefined
+                        }
+                        listening={false}
+                      />
+                    )}
 
                     {node.label && node.type !== 'instrument' && (
                       <Text
@@ -1766,7 +1833,10 @@ export function DiagramMap({
                     const rect = e.currentTarget.getBoundingClientRect()
                     const sx = (e.clientX - rect.left - ox) / s
                     const sy = (e.clientY - rect.top - oy) / s
-                    setStagePos({ x: stageSize.w / 2 - sx * scale, y: stageSize.h / 2 - sy * scale })
+                    setStagePos({
+                      x: stageSize.w / 2 - sx * scale,
+                      y: stageSize.h / 2 - sy * scale,
+                    })
                   }}
                 >
                   {localNodes.map((n) => {
