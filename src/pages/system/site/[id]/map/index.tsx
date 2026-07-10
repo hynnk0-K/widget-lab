@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { LayoutMap, type MapPin } from '@/widgets/layout-map'
-import { SiteIsoMap } from '@/widgets/site-iso-map'
+import { SiteIsoMap, useSiteFactoryStatus } from '@/widgets/site-iso-map'
 import { getSite, getSiteImage, putSiteImage, deleteSiteImage } from '@/entities/site/api/siteApi'
 import type { Site } from '@/entities/site/model/types'
 import { listFactories } from '@/entities/factory/api/factoryApi'
-import { useSiteFactoryStatus } from './model/useSiteFactoryStatus'
 
 export function SiteMapPage() {
   const { id } = useParams<{ id: string }>()

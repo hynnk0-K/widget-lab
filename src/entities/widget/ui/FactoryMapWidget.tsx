@@ -201,7 +201,7 @@ interface DrillLevel {
   name: string
 }
 
-export function FactoryMapWidget({ widget }: { widget: Widget }) {
+export function FactoryMapWidget({ widget, onBack }: { widget: Widget; onBack?: () => void }) {
   const { factoryId } = widget.config as FactoryMapConfig
   const navigate = useNavigate()
 
@@ -344,6 +344,15 @@ export function FactoryMapWidget({ widget }: { widget: Widget }) {
             </>
           ) : (
             <>
+              {onBack && (
+                <button
+                  onClick={onBack}
+                  className="text-slate-400 hover:text-[#003087] transition-colors flex-shrink-0"
+                  title="사업장 배치도로"
+                >
+                  ←
+                </button>
+              )}
               {factory?.name ?? widget.title}
               <span className="font-normal text-slate-400">공정 {processes.length}개</span>
             </>

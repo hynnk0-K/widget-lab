@@ -4,6 +4,8 @@ import { listFactories } from '@/entities/factory/api/factoryApi'
 import type { Factory } from '@/entities/factory/model/types'
 import { listLines } from '@/entities/line/api/lineApi'
 import type { Line } from '@/entities/line/model/types'
+import { listSites } from '@/entities/site/api/siteApi'
+import type { Site } from '@/entities/site/model/types'
 import type { Widget, WidgetType, SummaryKind } from '@/entities/widget/model/types'
 import { METRIC_LABELS } from '@/entities/widget/model/metricLabels'
 
@@ -62,6 +64,7 @@ const DEFAULT_SIZE: Record<WidgetType, { w: number; h: number }> = {
   'alarm-feed': { w: 4, h: 4 },
   'factory-map': { w: 6, h: 5 },
   'line-map': { w: 6, h: 5 },
+  'site-map': { w: 6, h: 5 },
 }
 
 const SUMMARY_KINDS: { value: SummaryKind; label: string }[] = [
@@ -72,13 +75,20 @@ const SUMMARY_KINDS: { value: SummaryKind; label: string }[] = [
   { value: 'comm-fault', label: '장애 / 통신단절' },
 ]
 
-const SOURCELESS_TYPES: WidgetType[] = ['summary', 'alarm-feed', 'factory-map', 'line-map']
+const SOURCELESS_TYPES: WidgetType[] = [
+  'summary',
+  'alarm-feed',
+  'factory-map',
+  'line-map',
+  'site-map',
+]
 
 const WIDGET_TYPES: { value: WidgetType; label: string; desc: string }[] = [
   { value: 'summary', label: '설비 요약 카드', desc: '전체/가동/유휴/알람 집계 수치' },
   { value: 'alarm-feed', label: '실시간 알람 피드', desc: '최신 알람 목록 실시간 표시' },
   { value: 'factory-map', label: '공장 도면 맵', desc: '공장 배치 이미지에 공정 핀 표시' },
   { value: 'line-map', label: '라인 센서 맵', desc: '라인 도면에 센서 실시간 값 표시' },
+  { value: 'site-map', label: '사업장 입체 배치도', desc: '공장별 상태를 아이소메트릭으로 표시' },
   { value: 'gauge', label: '게이지', desc: '현재 값을 반원 계기판으로 표시' },
   { value: 'trend', label: '추이', desc: '시간에 따른 변화를 꺾은선으로 표시' },
   { value: 'stat', label: '수치 카드', desc: '큰 숫자 + 기간 평균 대비 변화율' },
@@ -110,6 +120,8 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
   const [selectedFactoryId, setSelectedFactoryId] = useState<number | null>(null)
   const [lines, setLines] = useState<Line[]>([])
   const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
+  const [sites, setSites] = useState<Site[]>([])
+  const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
 
   const isSourceless = SOURCELESS_TYPES.includes(widgetType)
 
@@ -136,6 +148,14 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
     if (widgetType !== 'line-map') return
     listLines()
       .then(setLines)
+      .catch(() => {})
+  }, [widgetType])
+
+  // 사업장 목록 로드 (site-map 타입 선택 시)
+  useEffect(() => {
+    if (widgetType !== 'site-map') return
+    listSites()
+      .then(setSites)
       .catch(() => {})
   }, [widgetType])
 
@@ -216,6 +236,9 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
     } else if (widgetType === 'line-map') {
       if (!selectedLineId) return
       config = { lineId: selectedLineId }
+    } else if (widgetType === 'site-map') {
+      if (!selectedSiteId) return
+      config = { siteId: selectedSiteId }
     } else if (widgetType === 'gauge') {
       config = GAUGE_CONFIG[metric] ?? DEFAULT_GAUGE
     } else if (widgetType === 'trend') {
@@ -417,6 +440,35 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
             </div>
           )}
 
+          {/* site-map 사업장 선택 */}
+          {widgetType === 'site-map' && (
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-500 mb-1.5">
+                사업장 선택
+              </label>
+              <select
+                value={selectedSiteId ?? ''}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  setSelectedSiteId(id)
+                  const s = sites.find((s) => s.id === id)
+                  if (s) setTitle(`${s.name} 입체 배치도`)
+                }}
+                required
+                className="w-full h-9 px-3 border border-slate-200 rounded-lg text-[13px] text-slate-800 bg-white appearance-none focus:outline-none focus:border-[#003087] transition-colors cursor-pointer"
+              >
+                <option value="" disabled>
+                  사업장을 선택하세요
+                </option>
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* 설비 선택 (sourceless 타입은 숨김) */}
           {!isSourceless && (
             <div>
@@ -539,6 +591,7 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
                 !title.trim() ||
                 (widgetType === 'factory-map' && !selectedFactoryId) ||
                 (widgetType === 'line-map' && !selectedLineId) ||
+                (widgetType === 'site-map' && !selectedSiteId) ||
                 (!isSourceless && (!deviceCode || !metric))
               }
               className="flex-1 h-10 bg-[#003087] text-white rounded-xl text-[13px] font-semibold hover:bg-[#002470] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

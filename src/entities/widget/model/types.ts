@@ -10,6 +10,7 @@ export type WidgetType =
   | 'alarm-feed'
   | 'factory-map'
   | 'line-map'
+  | 'site-map'
 
 export interface WidgetSource {
   device: string
@@ -76,6 +77,10 @@ export interface LineMapConfig {
   lineId: number
 }
 
+export interface SiteMapConfig {
+  siteId: number
+}
+
 // ── 위젯 본체 ──
 export interface Widget {
   id: string
@@ -98,6 +103,7 @@ export interface Widget {
     | AlarmFeedConfig
     | FactoryMapConfig
     | LineMapConfig
+    | SiteMapConfig
 }
 
 export interface DashboardLayout {

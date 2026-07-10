@@ -13,6 +13,7 @@ import { SummaryCard } from '@/entities/widget/ui/SummaryCard'
 import { AlarmFeedWidget } from '@/entities/widget/ui/AlarmFeedWidget'
 import { FactoryMapWidget } from '@/entities/widget/ui/FactoryMapWidget'
 import { LineMapWidget } from '@/entities/widget/ui/LineMapWidget'
+import { SiteMapWidget } from '@/entities/widget/ui/SiteMapWidget'
 import type { DashboardLayout, Widget } from '@/entities/widget/model/types'
 
 interface Props {
@@ -94,6 +95,7 @@ export function WidgetGrid({ layout, editMode, onRemove, onLayoutChange }: Props
                 {widget.type === 'alarm-feed' && <AlarmFeedWidget widget={widget} />}
                 {widget.type === 'factory-map' && <FactoryMapWidget widget={widget} />}
                 {widget.type === 'line-map' && <LineMapWidget widget={widget} />}
+                {widget.type === 'site-map' && <SiteMapWidget widget={widget} />}
               </div>
 
               {editMode && (
