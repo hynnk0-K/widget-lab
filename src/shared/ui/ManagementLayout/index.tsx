@@ -48,6 +48,8 @@ const SECTION_CONFIG: Record<
       { label: '공정관리', href: '/service/process' },
       { label: '라인관리', href: '/service/line' },
       { label: '시설관리', href: '/service/facility' },
+      { label: '수집항목관리', href: '/service/collection' },
+      { label: '시스템연결관리', href: '/service/connections' },
     ],
   },
   system: {
@@ -84,6 +86,8 @@ const IMPLEMENTED = new Set([
   '/service/process',
   '/service/line',
   '/service/facility',
+  '/service/collection',
+  '/service/connections',
   '/system/company',
   '/system/site',
 ])

@@ -26,6 +26,8 @@ import { ProcessMapPage } from '@/pages/service/process/[id]/map'
 import { LinePage } from '@/pages/service/line'
 import { LineMapPage } from '@/pages/service/line/[id]/map'
 import { FacilityPage } from '@/pages/service/facility'
+import { CollectionSensorPage } from '@/pages/service/collection'
+import { SystemConnectionsPage } from '@/pages/service/connections'
 import { AlarmStatsPage } from '@/pages/statistics/alarm-stats'
 import { IncidentStatsPage } from '@/pages/statistics/incident-stats'
 import { DeviceHistoryPage } from '@/pages/statistics/device-history'
@@ -97,6 +99,8 @@ function App() {
                     <Route path="/service/line" element={<LinePage />} />
                     <Route path="/service/line/:id/map" element={<LineMapPage />} />
                     <Route path="/service/facility" element={<FacilityPage />} />
+                    <Route path="/service/collection" element={<CollectionSensorPage />} />
+                    <Route path="/service/connections" element={<SystemConnectionsPage />} />
                     <Route
                       path="/statistics"
                       element={<Navigate to="/statistics/alarm-stats" replace />}
