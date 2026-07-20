@@ -140,7 +140,7 @@ export function SensorDetailPanel({ sensorCode, onClose }: Props) {
 
     async function loadMaster() {
       const list = await api
-        .get<SensorMaster[]>(`/collection/sensors?parentType=${parentType}&parentId=${parentId}`)
+        .get<SensorMaster[]>('/collection/sensors?activeOnly=true')
         .catch(() => [] as SensorMaster[])
       if (!active) return
       const m = list.find((s) => s.code === sensorCode) ?? null
