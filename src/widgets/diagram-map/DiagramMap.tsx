@@ -165,6 +165,7 @@ export function getDefaultDims(type: PidSymbolType): { w: number; h: number } {
   if (type === 'generic') return { w: 68, h: 36 }
   if (type === 'zone') return { w: 160, h: 100 }
   if (type === 'equipment') return { w: 36, h: 36 }
+  if (type === 'sensor') return { w: 26, h: 26 }
   if (type === 'conveyor') return { w: 76, h: 24 }
   if (type === 'filter') return { w: 34, h: 44 }
   if (type === 'agitator') return { w: 40, h: 56 }
@@ -751,7 +752,7 @@ export function DiagramMap({
   const layerRef = useRef<KonvaLayer>(null)
 
   // 배관 흐름 + 알람 점멸 애니메이션 — React 재렌더 없이 Konva 노드만 갱신 (rAF)
-  const hasPipes = localEdges.some((e) => e.edgeType === 'pipe')
+  const hasPipes = localEdges.some((e) => e.edgeType !== 'signal')
   const hasBlink =
     !editMode &&
     localNodes.some((n) => n.deviceCode && alarmStatusByDevice?.[n.deviceCode] === 'critical')
@@ -1159,6 +1160,21 @@ export function DiagramMap({
   const zoneNodes = localNodes.filter((n) => n.type === 'zone')
   const symbolNodes = localNodes.filter((n) => n.type !== 'zone')
 
+  // 독립 수집 센서가 collection zone 밖으로 나가 있으면 "도면상 위치 지정됨" → 앵커 표시
+  const collectionZoneRects = zoneNodes
+    .filter((n) => n.zoneKind === 'collection')
+    .map((n) => {
+      const d = nodeDims(n)
+      return { x: n.x - d.w / 2, y: n.y - d.h / 2, w: d.w, h: d.h }
+    })
+  function sensorPlaced(node: DiagramNode): boolean {
+    if (node.type !== 'sensor') return false
+    if (collectionZoneRects.length === 0) return true // zone이 없으면 전부 배치된 것으로 간주
+    return !collectionZoneRects.some(
+      (r) => node.x >= r.x && node.x <= r.x + r.w && node.y >= r.y && node.y <= r.y + r.h,
+    )
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {/* 툴바 */}
@@ -1193,7 +1209,7 @@ export function DiagramMap({
             }
             return (
               <>
-                {selEdge.edgeType === 'pipe' && (
+                {selEdge.edgeType !== 'signal' && (
                   <select
                     value={selEdge.medium ?? 'default'}
                     onChange={(e) => patch({ medium: e.target.value })}
@@ -1448,7 +1464,8 @@ export function DiagramMap({
                 if (!from || !to) return null
                 const pts = calcEdgePoints(from, to, edge)
                 const isSel = selectedId === edge.id
-                const isPipe = edge.edgeType === 'pipe'
+                // signal 외 모든 타입(pipe/flow/material 등)은 흐름 배관으로 렌더
+                const isPipe = edge.edgeType !== 'signal'
                 const med = PIPE_MEDIUM[edge.medium ?? 'default'] ?? PIPE_MEDIUM.default
                 const stroke = isSel ? '#3b82f6' : isPipe ? med.color : '#475569'
                 const mid = edge.label ? polylineMidpoint(pts) : null
@@ -1567,10 +1584,12 @@ export function DiagramMap({
 
               {/* 심볼 노드 */}
               {symbolNodes.map((node) => {
-                const marker =
-                  !editMode && node.deviceCode ? sensorMarkers?.[node.deviceCode] : undefined
+                // 설비(deviceCode)·독립센서(sensorCode) 통합 식별자
+                const devCode = node.deviceCode ?? node.sensorCode
+                const marker = !editMode && devCode ? sensorMarkers?.[devCode] : undefined
                 if (marker) {
                   const st = MARKER_STYLE[marker.risk]
+                  const placed = node.type === 'sensor' && sensorPlaced(node)
                   // 마커는 역스케일로 화면 고정 크기 유지 — 축소해도 읽을 수 있게
                   const inv = 1 / scale
                   const abnormal =
@@ -1590,9 +1609,19 @@ export function DiagramMap({
                         opacity={marker.risk === 'offline' ? 0.55 : 1}
                         onClick={(e) => {
                           e.cancelBubble = true
-                          onMarkerClick?.(node.deviceCode!)
+                          onMarkerClick?.(devCode!)
                         }}
                       >
+                        {placed && (
+                          <Line
+                            points={[-3, 4.5, 3, 4.5, 0, 10]}
+                            closed
+                            fill={st.dot}
+                            stroke="#ffffff"
+                            strokeWidth={0.8}
+                            listening={false}
+                          />
+                        )}
                         <Circle
                           radius={4.5}
                           fill={st.dot}
@@ -1622,9 +1651,19 @@ export function DiagramMap({
                       opacity={marker.risk === 'offline' ? 0.75 : 1}
                       onClick={(e) => {
                         e.cancelBubble = true
-                        onMarkerClick?.(node.deviceCode!)
+                        onMarkerClick?.(devCode!)
                       }}
                     >
+                      {placed && (
+                        <Line
+                          points={[w / 2 - 4, h, w / 2 + 4, h, w / 2, h + 8]}
+                          closed
+                          fill={st.stroke}
+                          stroke="#ffffff"
+                          strokeWidth={1}
+                          listening={false}
+                        />
+                      )}
                       <Rect
                         width={w}
                         height={h}
@@ -1654,6 +1693,62 @@ export function DiagramMap({
                         fill={st.value}
                         listening={false}
                       />
+                    </Group>
+                  )
+                }
+
+                // 독립 수집 센서 — 센서 버블(원)로 렌더, 클릭 시 상세로
+                if (node.type === 'sensor') {
+                  const isSel = selectedId === node.id
+                  const isPending = pendingFrom?.id === node.id
+                  const c = isSel || isPending ? '#3b82f6' : (node.color ?? '#0ea5e9')
+                  const placed = sensorPlaced(node)
+                  return (
+                    <Group
+                      key={node.id}
+                      x={node.x}
+                      y={node.y}
+                      draggable={editMode && tool === 'select'}
+                      onClick={(e) => {
+                        if (!editMode && devCode) {
+                          e.cancelBubble = true
+                          onDeviceClick?.(devCode)
+                          return
+                        }
+                        handleNodeClick(node.id, e)
+                      }}
+                      onDblClick={(e) => handleNodeDblClick(node.id, e)}
+                      onDragEnd={(e) => handleNodeDragEnd(node.id, e.target.x(), e.target.y())}
+                    >
+                      {placed && (
+                        <Line
+                          points={[-5, 13, 5, 13, 0, 21]}
+                          closed
+                          fill={c}
+                          stroke="#ffffff"
+                          strokeWidth={1}
+                          listening={false}
+                        />
+                      )}
+                      <Circle
+                        radius={13}
+                        fill="#ffffff"
+                        stroke={c}
+                        strokeWidth={isSel || isPending ? 2.5 : 2}
+                      />
+                      <Circle radius={5} fill={c} listening={false} />
+                      {node.label && (
+                        <Text
+                          x={-34}
+                          y={18}
+                          width={68}
+                          align="center"
+                          text={node.label}
+                          fontSize={9}
+                          fill="#475569"
+                          listening={false}
+                        />
+                      )}
                     </Group>
                   )
                 }

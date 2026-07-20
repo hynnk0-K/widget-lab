@@ -7,6 +7,7 @@ import {
   type DiagramData,
 } from '@/shared/lib/diagramStorage'
 import { readImageFile } from '@/shared/lib/readImageFile'
+import { saveFlowEdges } from '@/entities/flow/api/flowEdgeApi'
 import { getLine, getLineImage, putLineImage, deleteLineImage } from '@/entities/line/api/lineApi'
 import type { Line } from '@/entities/line/model/types'
 import { listEquipments, listEquipmentLive } from '@/entities/equipment/api/equipmentApi'
@@ -63,6 +64,7 @@ export function useLineMap(lineId: number) {
       if (saveDiagramTimerRef.current) {
         clearTimeout(saveDiagramTimerRef.current)
         saveDiagram('line', lineId, diagramRef.current)
+        saveFlowEdges('LINE', lineId, diagramRef.current.edges).catch(() => {})
       }
     }
   }, [lineId])
@@ -106,7 +108,12 @@ export function useLineMap(lineId: number) {
   function handleDiagramChange(next: DiagramData) {
     setDiagram(next)
     if (saveDiagramTimerRef.current) clearTimeout(saveDiagramTimerRef.current)
-    saveDiagramTimerRef.current = setTimeout(() => { saveDiagram('line', lineId, next) }, 600)
+    // nodes 위치는 diagram PUT, edges(flow)는 flow-edges 일괄 저장으로 분리
+    // ponytail: 노드만 옮겨도 flow를 재전송함(bulk는 멱등). 트래픽 문제되면 edges 변경 감지 추가
+    saveDiagramTimerRef.current = setTimeout(() => {
+      saveDiagram('line', lineId, next)
+      saveFlowEdges('LINE', lineId, next.edges).catch(() => {})
+    }, 600)
   }
 
   function toggleShowBg() {

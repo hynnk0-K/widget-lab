@@ -18,6 +18,7 @@ export type PidSymbolType =
   | 'generic'
   | 'zone' // 구역 레이블 (WBGT 등 오버레이용)
   | 'equipment' // 스크립트 자동 생성 설비 노드
+  | 'sensor' // 설비 비소속 독립 수집 센서 노드 (BE collection_sensors)
 
 export type PortSide = 't' | 'r' | 'b' | 'l' // 노즐(포트) 위치
 
@@ -33,9 +34,15 @@ export interface DiagramNode {
   height?: number // 사용자 지정 높이
   imageBase64?: string // 설정 시 심볼 대신 이미지 렌더
   linkedId?: number // zone: 연결된 공정/라인 ID, equipment: 설비 ID
-  zoneKind?: 'line' | 'type' // 자동 생성 zone 구분 (line=배경, type=타입그룹)
+  zoneKind?: 'line' | 'type' | 'collection' // 자동 생성 zone 구분 (line=배경, type=타입그룹, collection=독립센서)
   color?: string // zone 커스텀 색상 (타입그룹별)
   equipmentType?: string // 설비 타입 분류 (WBGT, CNC 등)
+  // ── BE 자동 생성 메타 (generate_diagrams.py) ──
+  sensorCode?: string // sensor 노드: 독립 수집 센서 코드
+  sensorType?: string // sensor 노드: 센서 유형 (VIBRATION, NOISE 등)
+  category?: string // equipment 노드: EHS 카테고리 slug (실시간 값 자동 매핑용)
+  primaryMetric?: string // equipment 노드: 대표 metric
+  unit?: string // 값 단위
 }
 
 export interface DiagramEdge {

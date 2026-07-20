@@ -73,7 +73,10 @@ function App() {
                     <Route path="/realtime/dashboard" element={<HomePage />} />
                     <Route path="/realtime/overview" element={<RealtimeOverviewPage />} />
                     <Route path="/realtime/process/:id" element={<ProcessEquipmentPage />} />
-                    <Route path="/realtime/ehs-detail/:category" element={<EhsDetailKeyWrapper />} />
+                    <Route
+                      path="/realtime/ehs-detail/:category"
+                      element={<EhsDetailKeyWrapper />}
+                    />
                     <Route path="/realtime/environment" element={<RealtimeEnvironmentPage />} />
                     <Route path="/realtime/safety" element={<RealtimeSafetyPage />} />
                     <Route path="/realtime/firefighting" element={<RealtimeFirefightingPage />} />

@@ -8,6 +8,7 @@ import {
   type MapMode,
   type DiagramData,
 } from '@/shared/lib/diagramStorage'
+import { saveFlowEdges } from '@/entities/flow/api/flowEdgeApi'
 import { getFactory, getFactoryImage, putFactoryImage, deleteFactoryImage } from '@/entities/factory/api/factoryApi'
 import type { Factory } from '@/entities/factory/model/types'
 import { listProcesses, updateProcess } from '@/entities/process/api/processApi'
@@ -69,6 +70,7 @@ export function useFactoryMap(factoryId: number) {
       if (saveDiagramTimerRef.current) {
         clearTimeout(saveDiagramTimerRef.current)
         saveDiagram('factory', factoryId, diagramRef.current)
+        saveFlowEdges('FACTORY', factoryId, diagramRef.current.edges).catch(() => {})
       }
     }
   }, [factoryId])
@@ -95,7 +97,10 @@ export function useFactoryMap(factoryId: number) {
   function handleDiagramChange(next: DiagramData) {
     setDiagram(next)
     if (saveDiagramTimerRef.current) clearTimeout(saveDiagramTimerRef.current)
-    saveDiagramTimerRef.current = setTimeout(() => { saveDiagram('factory', factoryId, next) }, 600)
+    saveDiagramTimerRef.current = setTimeout(() => {
+      saveDiagram('factory', factoryId, next)
+      saveFlowEdges('FACTORY', factoryId, next.edges).catch(() => {})
+    }, 600)
   }
 
   async function handleImageUpload(base64: string, width: number, height: number) {

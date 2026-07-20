@@ -57,8 +57,10 @@ export function RealtimeEnvironmentPage() {
           <div>
             <h2 className="m-0 text-[15px] font-semibold text-slate-800">환경설비 모니터링</h2>
             <p className="m-0 mt-0.5 text-[11px] text-slate-400">
-              5초마다 갱신
-              {updatedAt && ` · 마지막 ${updatedAt.toLocaleTimeString('ko-KR', { hour12: false })}`}
+              {/* 5초마다 갱신 */}
+              {/* {updatedAt && ` · 마지막 ${updatedAt.toLocaleTimeString('ko-KR', { hour12: false })}`} */}
+              {updatedAt &&
+                ` 마지막 갱신 시각 · ${updatedAt.toLocaleTimeString('ko-KR', { hour12: false })}`}
             </p>
           </div>
           <div className="flex border border-slate-200 rounded-lg overflow-hidden text-[12px]">

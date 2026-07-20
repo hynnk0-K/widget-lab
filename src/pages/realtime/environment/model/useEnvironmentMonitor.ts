@@ -8,6 +8,9 @@ import { ENV_SLUGS, STALE_MS, fmtMetricValue, RISK_RANK } from '@/entities/ehs/m
 import type { DeviceRisk } from '@/entities/ehs/model/envSensors'
 import type { EhsCategoryConfig, EhsRiskLevel } from '@/entities/ehs/model/types'
 import { loadDiagram, type DiagramData } from '@/shared/lib/diagramStorage'
+import { api } from '@/shared/lib/api'
+import { classifyRisk, type SensorThresholds } from '@/entities/collection/model/classifyRisk'
+import { sensorTypeMeta } from '@/entities/collection/model/sensorTypeMeta'
 import type { SensorMarker } from '@/widgets/diagram-map'
 
 export type { DeviceRisk }
@@ -24,6 +27,29 @@ export interface EnvCategoryGroup {
   cfg: EhsCategoryConfig
   devices: EnvDevice[]
   worst: DeviceRisk
+}
+
+// 독립 수집 센서 (설비 비소속) — 센서 유형별 묶음
+export interface CollectionGroup {
+  type: string
+  label: string
+  color: string
+  devices: EnvDevice[]
+  worst: DeviceRisk
+}
+
+interface CollectionMaster extends SensorThresholds {
+  code: string
+  name?: string
+  sensor_type?: string
+  parent_type?: string
+  parent_id?: number
+}
+
+interface CollectionLatest {
+  ts: string
+  sensor_code: string
+  value: number | null
 }
 
 export interface EnvEvent {
@@ -46,6 +72,75 @@ export function useEnvironmentMonitor() {
   const [loading, setLoading] = useState(true)
   const prevRiskRef = useRef<Map<string, DeviceRisk>>(new Map())
   const eventIdRef = useRef(1)
+  // 독립 수집 센서 (전 계층)
+  const [colMasters, setColMasters] = useState<CollectionMaster[]>([])
+  const [colLatest, setColLatest] = useState<CollectionLatest[]>([])
+
+  useEffect(() => {
+    let active = true
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    async function start() {
+      const masters = await api
+        .get<CollectionMaster[]>('/collection/sensors?activeOnly=true')
+        .catch(() => [] as CollectionMaster[])
+      if (!active) return
+      setColMasters(masters)
+      if (masters.length === 0) return
+
+      async function refresh() {
+        const rows = await api
+          .get<CollectionLatest[]>('/collection/data/all-latest')
+          .catch(() => [] as CollectionLatest[])
+        if (active) setColLatest(rows)
+      }
+      await refresh()
+      timer = setInterval(refresh, POLL_MS)
+    }
+
+    start()
+    return () => {
+      active = false
+      if (timer) clearInterval(timer)
+    }
+  }, [])
+
+  // 독립 수집 센서 → 유형별 그룹 + 마커
+  const { collectionGroups, collectionMarkers, collectionCodes } = useMemo(() => {
+    const latestByCode = new Map(colLatest.map((r) => [r.sensor_code, r]))
+    const now = Date.now()
+    const byType = new Map<string, EnvDevice[]>()
+    const markers: Record<string, SensorMarker> = {}
+
+    for (const m of colMasters) {
+      const row = latestByCode.get(m.code)
+      const stale = row ? now - new Date(row.ts).getTime() > STALE_MS : true
+      const value = row && !stale ? row.value : null
+      const risk: DeviceRisk = value != null ? classifyRisk(value, m) : 'offline'
+      const valueText = value != null ? fmtMetricValue(value, m.unit ?? '') : '—'
+      const dev: EnvDevice = { code: m.code, valueText, risk }
+      const t = m.sensor_type ?? 'ETC'
+      if (!byType.has(t)) byType.set(t, [])
+      byType.get(t)!.push(dev)
+      markers[m.code] = { label: m.name || m.code, valueText, risk }
+    }
+
+    const groups: CollectionGroup[] = [...byType.entries()].map(([type, devices]) => {
+      const meta = sensorTypeMeta(type)
+      const sorted = [...devices].sort((a, b) => RISK_RANK[b.risk] - RISK_RANK[a.risk])
+      const worst = sorted.reduce<DeviceRisk>(
+        (acc, d) => (RISK_RANK[d.risk] > RISK_RANK[acc] ? d.risk : acc),
+        'normal',
+      )
+      return { type, label: meta.label, color: meta.color, devices: sorted, worst }
+    })
+
+    return {
+      collectionGroups: groups,
+      collectionMarkers: markers,
+      collectionCodes: new Set(colMasters.map((m) => m.code)),
+    }
+  }, [colMasters, colLatest])
 
   useEffect(() => {
     let active = true
@@ -125,17 +220,19 @@ export function useEnvironmentMonitor() {
     }
   }, [])
 
+  // 환경 설비 + 독립 수집 센서 합산
   const counts = useMemo(() => {
     const c = { normal: 0, caution: 0, alert: 0, offline: 0 }
-    for (const g of groups)
-      for (const d of g.devices) {
-        if (d.risk === 'normal') c.normal++
-        else if (d.risk === 'caution') c.caution++
-        else if (d.risk === 'offline') c.offline++
-        else c.alert++
-      }
+    const tally = (risk: DeviceRisk) => {
+      if (risk === 'normal') c.normal++
+      else if (risk === 'caution') c.caution++
+      else if (risk === 'offline') c.offline++
+      else c.alert++
+    }
+    for (const g of groups) for (const d of g.devices) tally(d.risk)
+    for (const g of collectionGroups) for (const d of g.devices) tally(d.risk)
     return c
-  }, [groups])
+  }, [groups, collectionGroups])
 
   const sensorMarkers = useMemo(() => {
     const m: Record<string, SensorMarker> = {}
@@ -146,8 +243,9 @@ export function useEnvironmentMonitor() {
           valueText: d.valueText,
           risk: d.risk,
         }
-    return m
-  }, [groups])
+    // 독립 수집 센서 마커도 도면에 함께 표시
+    return { ...m, ...collectionMarkers }
+  }, [groups, collectionMarkers])
 
   const slugByDevice = useMemo(() => {
     const m: Record<string, string> = {}
@@ -234,6 +332,8 @@ export function useEnvironmentMonitor() {
     counts,
     events,
     updatedAt,
+    collectionGroups,
+    collectionCodes,
     sensorMarkers,
     slugByDevice,
     mappedLines,

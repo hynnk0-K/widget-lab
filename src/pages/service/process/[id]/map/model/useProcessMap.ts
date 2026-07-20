@@ -8,6 +8,7 @@ import {
   type MapMode,
   type DiagramData,
 } from '@/shared/lib/diagramStorage'
+import { saveFlowEdges } from '@/entities/flow/api/flowEdgeApi'
 import { getProcess, getProcessImage, putProcessImage, deleteProcessImage } from '@/entities/process/api/processApi'
 import type { Process } from '@/entities/process/model/types'
 import { listLines, updateLine } from '@/entities/line/api/lineApi'
@@ -57,6 +58,7 @@ export function useProcessMap(processId: number) {
       if (saveDiagramTimerRef.current) {
         clearTimeout(saveDiagramTimerRef.current)
         saveDiagram('process', processId, diagramRef.current)
+        saveFlowEdges('PROCESS', processId, diagramRef.current.edges).catch(() => {})
       }
     }
   }, [processId])
@@ -83,7 +85,10 @@ export function useProcessMap(processId: number) {
   function handleDiagramChange(next: DiagramData) {
     setDiagram(next)
     if (saveDiagramTimerRef.current) clearTimeout(saveDiagramTimerRef.current)
-    saveDiagramTimerRef.current = setTimeout(() => { saveDiagram('process', processId, next) }, 600)
+    saveDiagramTimerRef.current = setTimeout(() => {
+      saveDiagram('process', processId, next)
+      saveFlowEdges('PROCESS', processId, next.edges).catch(() => {})
+    }, 600)
   }
 
   async function handleImageUpload(base64: string, width: number, height: number) {

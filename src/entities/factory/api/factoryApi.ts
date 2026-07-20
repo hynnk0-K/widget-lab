@@ -32,7 +32,10 @@ export function getFactoryImage(id: number) {
   return api.get<LayoutImageDto>(`/master/factories/${id}/image`)
 }
 
-export function putFactoryImage(id: number, body: { imageBase64: string; width: number; height: number }) {
+export function putFactoryImage(
+  id: number,
+  body: { imageBase64: string; width: number; height: number },
+) {
   return api.put<LayoutImageDto>(`/master/factories/${id}/image`, body)
 }
 
