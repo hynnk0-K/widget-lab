@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FormField } from '@/shared/ui/FormModal'
-import { listFactories } from '@/entities/factory/api/factoryApi'
-import { listProcesses, createProcess, updateProcess, deleteProcess } from '@/entities/process/api/processApi'
+import { factoryQueries } from '@/entities/factory/api/factoryQueries'
+import { processQueries } from '@/entities/process/api/processQueries'
+import { createProcess, updateProcess, deleteProcess } from '@/entities/process/api/processApi'
 import type { Process } from '@/entities/process/model/types'
 
 interface Factory { id: number; name: string }
@@ -10,24 +12,17 @@ export interface ProcessRow extends Process { factory?: Factory; factoryName?: s
 const EMPTY: Record<string, string> = { factoryId: '', code: '', name: '', description: '' }
 
 export function useProcessCrud() {
-  const [rows, setRows] = useState<ProcessRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [factories, setFactories] = useState<Factory[]>([])
+  const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<ProcessRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<ProcessRow[]>([])
 
-  useEffect(() => {
-    loadRows()
-    listFactories().then(setFactories).catch(() => setFactories([]))
-  }, [])
+  const { data: rows = [], isLoading: loading } = useQuery(processQueries.list())
+  const { data: factories = [] } = useQuery(factoryQueries.list())
 
-  async function loadRows() {
-    setLoading(true)
-    try { setRows(await listProcesses()) }
-    catch { setRows([]) }
-    finally { setLoading(false) }
+  function invalidateRows() {
+    return queryClient.invalidateQueries({ queryKey: ['process'] })
   }
 
   function openCreate() {
@@ -58,13 +53,13 @@ export function useProcessCrud() {
     if (editTarget) await updateProcess(editTarget.id, body)
     else await createProcess(body)
     setFormOpen(false)
-    loadRows()
+    await invalidateRows()
   }
 
   async function handleDelete() {
     for (const t of deleteTargets) await deleteProcess(t.id)
     setDeleteTargets([])
-    loadRows()
+    await invalidateRows()
   }
 
   const fields: FormField[] = [

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { listProcesses } from '@/entities/process/api/processApi'
-import { listLines } from '@/entities/line/api/lineApi'
+import { useQuery } from '@tanstack/react-query'
+import { processQueries } from '@/entities/process/api/processQueries'
+import { lineQueries } from '@/entities/line/api/lineQueries'
 import { fetchEnvSensorMarkers, RISK_RANK } from '@/entities/ehs/model/envSensors'
 import type { DeviceRisk } from '@/entities/ehs/model/envSensors'
 import { loadDiagram } from '@/shared/lib/diagramStorage'
@@ -15,16 +16,15 @@ const POLL_MS = 10_000
 // 공장 → 공정 → 라인 도면의 deviceCode를 모아 공장별 설비 수 + 최악 등급 집계 (10초 폴링)
 export function useSiteFactoryStatus(factoryIds: number[]) {
   const [status, setStatus] = useState<Record<number, FactoryStatus>>({})
+  const { data: procs } = useQuery(processQueries.list())
+  const { data: lines } = useQuery(lineQueries.list())
 
   useEffect(() => {
-    if (factoryIds.length === 0) return
+    if (factoryIds.length === 0 || !procs || !lines) return
     let active = true
     let timer: ReturnType<typeof setInterval> | null = null
 
     async function build() {
-      const [procs, lines] = await Promise.all([listProcesses(), listLines()])
-      if (!active) return
-
       const codesByFactory = new Map<number, string[]>()
       const lineIds = new Set<number>()
       const factoryOfLine = new Map<number, number>()
@@ -78,7 +78,7 @@ export function useSiteFactoryStatus(factoryIds: number[]) {
       if (timer) clearInterval(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [factoryIds.join(',')])
+  }, [factoryIds.join(','), procs, lines])
 
   return status
 }

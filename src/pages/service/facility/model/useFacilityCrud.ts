@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FormField } from '@/shared/ui/FormModal'
 import { api } from '@/shared/lib/api'
+import { lineQueries } from '@/entities/line/api/lineQueries'
 
 interface Line {
   id: number
@@ -20,31 +22,20 @@ export interface Equipment {
 const EMPTY: Record<string, string> = { lineId: '', type: '', code: '', name: '', description: '' }
 
 export function useFacilityCrud() {
-  const [rows, setRows] = useState<Equipment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [lines, setLines] = useState<Line[]>([])
+  const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Equipment | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<Equipment[]>([])
 
-  useEffect(() => {
-    loadRows()
-    api
-      .get<Line[]>('/master/lines')
-      .then(setLines)
-      .catch(() => setLines([]))
-  }, [])
+  const { data: rows = [], isLoading: loading } = useQuery({
+    queryKey: ['equipment', 'list', null],
+    queryFn: () => api.get<Equipment[]>('/master/equipments'),
+  })
+  const { data: lines = [] } = useQuery(lineQueries.list()) as { data: Line[] }
 
-  async function loadRows() {
-    setLoading(true)
-    try {
-      setRows(await api.get<Equipment[]>('/master/equipments'))
-    } catch {
-      setRows([])
-    } finally {
-      setLoading(false)
-    }
+  function invalidateRows() {
+    return queryClient.invalidateQueries({ queryKey: ['equipment'] })
   }
 
   function openCreate() {
@@ -77,13 +68,13 @@ export function useFacilityCrud() {
     if (editTarget) await api.put(`/master/equipments/${editTarget.id}`, body)
     else await api.post('/master/equipments', body)
     setFormOpen(false)
-    loadRows()
+    await invalidateRows()
   }
 
   async function handleDelete() {
     for (const t of deleteTargets) await api.delete(`/master/equipments/${t.id}`)
     setDeleteTargets([])
-    loadRows()
+    await invalidateRows()
   }
 
   const fields: FormField[] = [

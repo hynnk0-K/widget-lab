@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FormField } from '@/shared/ui/FormModal'
-import { listProcesses } from '@/entities/process/api/processApi'
-import { listLines, createLine, updateLine, deleteLine } from '@/entities/line/api/lineApi'
+import { processQueries } from '@/entities/process/api/processQueries'
+import { lineQueries } from '@/entities/line/api/lineQueries'
+import { createLine, updateLine, deleteLine } from '@/entities/line/api/lineApi'
 import type { Line } from '@/entities/line/model/types'
 
 interface Process { id: number; name: string }
@@ -10,24 +12,17 @@ export interface LineRow extends Line { process?: Process; processName?: string 
 const EMPTY: Record<string, string> = { processId: '', code: '', name: '', description: '' }
 
 export function useLineCrud() {
-  const [rows, setRows] = useState<LineRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [processes, setProcesses] = useState<Process[]>([])
+  const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<LineRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<LineRow[]>([])
 
-  useEffect(() => {
-    loadRows()
-    listProcesses().then(setProcesses).catch(() => setProcesses([]))
-  }, [])
+  const { data: rows = [], isLoading: loading } = useQuery(lineQueries.list())
+  const { data: processes = [] } = useQuery(processQueries.list())
 
-  async function loadRows() {
-    setLoading(true)
-    try { setRows(await listLines()) }
-    catch { setRows([]) }
-    finally { setLoading(false) }
+  function invalidateRows() {
+    return queryClient.invalidateQueries({ queryKey: ['line'] })
   }
 
   function openCreate() {
@@ -58,13 +53,13 @@ export function useLineCrud() {
     if (editTarget) await updateLine(editTarget.id, body)
     else await createLine(body)
     setFormOpen(false)
-    loadRows()
+    await invalidateRows()
   }
 
   async function handleDelete() {
     for (const t of deleteTargets) await deleteLine(t.id)
     setDeleteTargets([])
-    loadRows()
+    await invalidateRows()
   }
 
   const fields: FormField[] = [

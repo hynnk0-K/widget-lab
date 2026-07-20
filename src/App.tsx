@@ -79,7 +79,10 @@ function App() {
                       element={<EhsDetailKeyWrapper />}
                     />
                     <Route path="/realtime/environment" element={<RealtimeEnvironmentPage />} />
-                    <Route path="/realtime/collection-detail/:type" element={<CollectionDetailPage />} />
+                    <Route
+                      path="/realtime/collection-detail/:type"
+                      element={<CollectionDetailPage />}
+                    />
                     <Route path="/realtime/safety" element={<RealtimeSafetyPage />} />
                     <Route path="/realtime/firefighting" element={<RealtimeFirefightingPage />} />
                     <Route path="/realtime/comm-status" element={<RealtimeCommStatusPage />} />

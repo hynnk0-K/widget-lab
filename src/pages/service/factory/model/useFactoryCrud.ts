@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FormField } from '@/shared/ui/FormModal'
-import { listSites } from '@/entities/site/api/siteApi'
-import { listFactories, createFactory, updateFactory, deleteFactory } from '@/entities/factory/api/factoryApi'
+import { siteQueries } from '@/entities/site/api/siteQueries'
+import { factoryQueries } from '@/entities/factory/api/factoryQueries'
+import { createFactory, updateFactory, deleteFactory } from '@/entities/factory/api/factoryApi'
 import type { Factory } from '@/entities/factory/model/types'
 
 interface Site { id: number; name: string }
@@ -10,24 +12,17 @@ export interface FactoryRow extends Factory { site?: Site; siteName?: string }
 const EMPTY: Record<string, string> = { siteId: '', code: '', name: '', description: '' }
 
 export function useFactoryCrud() {
-  const [rows, setRows] = useState<FactoryRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sites, setSites] = useState<Site[]>([])
+  const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<FactoryRow | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<FactoryRow[]>([])
 
-  useEffect(() => {
-    loadRows()
-    listSites().then(setSites).catch(() => setSites([]))
-  }, [])
+  const { data: rows = [], isLoading: loading } = useQuery(factoryQueries.list())
+  const { data: sites = [] } = useQuery(siteQueries.list())
 
-  async function loadRows() {
-    setLoading(true)
-    try { setRows(await listFactories()) }
-    catch { setRows([]) }
-    finally { setLoading(false) }
+  function invalidateRows() {
+    return queryClient.invalidateQueries({ queryKey: ['factory'] })
   }
 
   function openCreate() {
@@ -58,13 +53,13 @@ export function useFactoryCrud() {
     if (editTarget) await updateFactory(editTarget.id, body)
     else await createFactory(body)
     setFormOpen(false)
-    loadRows()
+    await invalidateRows()
   }
 
   async function handleDelete() {
     for (const t of deleteTargets) await deleteFactory(t.id)
     setDeleteTargets([])
-    loadRows()
+    await invalidateRows()
   }
 
   const fields: FormField[] = [

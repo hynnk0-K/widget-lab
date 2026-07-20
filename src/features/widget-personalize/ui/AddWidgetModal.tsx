@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { api } from '@/shared/lib/api'
-import { listFactories } from '@/entities/factory/api/factoryApi'
-import type { Factory } from '@/entities/factory/model/types'
-import { listLines } from '@/entities/line/api/lineApi'
-import type { Line } from '@/entities/line/model/types'
-import { listSites } from '@/entities/site/api/siteApi'
-import type { Site } from '@/entities/site/model/types'
+import { factoryQueries } from '@/entities/factory/api/factoryQueries'
+import { lineQueries } from '@/entities/line/api/lineQueries'
+import { siteQueries } from '@/entities/site/api/siteQueries'
 import type { Widget, WidgetType, SummaryKind } from '@/entities/widget/model/types'
 import { METRIC_LABELS } from '@/entities/widget/model/metricLabels'
 
@@ -116,11 +114,8 @@ function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
 export function AddWidgetModal({ onAdd, onClose }: Props) {
   const [widgetType, setWidgetType] = useState<WidgetType>('summary')
   const [summaryKind, setSummaryKind] = useState<SummaryKind>('total')
-  const [factories, setFactories] = useState<Factory[]>([])
   const [selectedFactoryId, setSelectedFactoryId] = useState<number | null>(null)
-  const [lines, setLines] = useState<Line[]>([])
   const [selectedLineId, setSelectedLineId] = useState<number | null>(null)
-  const [sites, setSites] = useState<Site[]>([])
   const [selectedSiteId, setSelectedSiteId] = useState<number | null>(null)
 
   const isSourceless = SOURCELESS_TYPES.includes(widgetType)
@@ -135,29 +130,19 @@ export function AddWidgetModal({ onAdd, onClose }: Props) {
   const [metric, setMetric] = useState('')
   const [title, setTitle] = useState('')
 
-  // 공장 목록 로드 (factory-map 타입 선택 시)
-  useEffect(() => {
-    if (widgetType !== 'factory-map') return
-    listFactories()
-      .then(setFactories)
-      .catch(() => {})
-  }, [widgetType])
-
-  // 라인 목록 로드 (line-map 타입 선택 시)
-  useEffect(() => {
-    if (widgetType !== 'line-map') return
-    listLines()
-      .then(setLines)
-      .catch(() => {})
-  }, [widgetType])
-
-  // 사업장 목록 로드 (site-map 타입 선택 시)
-  useEffect(() => {
-    if (widgetType !== 'site-map') return
-    listSites()
-      .then(setSites)
-      .catch(() => {})
-  }, [widgetType])
+  // 계층 목록 — 해당 위젯 타입을 고를 때만 조회
+  const { data: factories = [] } = useQuery({
+    ...factoryQueries.list(),
+    enabled: widgetType === 'factory-map',
+  })
+  const { data: lines = [] } = useQuery({
+    ...lineQueries.list(),
+    enabled: widgetType === 'line-map',
+  })
+  const { data: sites = [] } = useQuery({
+    ...siteQueries.list(),
+    enabled: widgetType === 'site-map',
+  })
 
   // 설비 목록 초기 로드
   useEffect(() => {

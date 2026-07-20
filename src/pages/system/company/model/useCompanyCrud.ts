@@ -1,24 +1,22 @@
-import { useEffect, useState } from 'react'
-import { listCompanies, createCompany, updateCompany, deleteCompany } from '@/entities/company/api/companyApi'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { companyQueries } from '@/entities/company/api/companyQueries'
+import { createCompany, updateCompany, deleteCompany } from '@/entities/company/api/companyApi'
 import type { Company } from '@/entities/company/model/types'
 
 const EMPTY: Record<string, string> = { code: '', name: '', description: '' }
 
 export function useCompanyCrud() {
-  const [rows, setRows] = useState<Company[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [formOpen, setFormOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Company | null>(null)
   const [formValues, setFormValues] = useState(EMPTY)
   const [deleteTargets, setDeleteTargets] = useState<Company[]>([])
 
-  useEffect(() => { loadRows() }, [])
+  const { data: rows = [], isLoading: loading } = useQuery(companyQueries.list())
 
-  async function loadRows() {
-    setLoading(true)
-    try { setRows(await listCompanies()) }
-    catch { setRows([]) }
-    finally { setLoading(false) }
+  function invalidateRows() {
+    return queryClient.invalidateQueries({ queryKey: ['company'] })
   }
 
   function openCreate() {
@@ -39,13 +37,13 @@ export function useCompanyCrud() {
     if (editTarget) await updateCompany(editTarget.id, body)
     else await createCompany(body)
     setFormOpen(false)
-    loadRows()
+    await invalidateRows()
   }
 
   async function handleDelete() {
     for (const t of deleteTargets) await deleteCompany(t.id)
     setDeleteTargets([])
-    loadRows()
+    await invalidateRows()
   }
 
   return {
