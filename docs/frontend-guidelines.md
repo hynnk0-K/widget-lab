@@ -580,7 +580,7 @@ Remember these principles can conflict:
 Consider refactoring when:
 
 - A file exceeds 200 lines
-- A function exceeds 80 lines
+- A function exceeds 100 lines
 - Props are passed through 3+ components unchanged
 - The same code appears in 3+ places
 - A component has 3+ separate responsibilities
