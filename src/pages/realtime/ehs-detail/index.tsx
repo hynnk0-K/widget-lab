@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Search, ExternalLink } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
@@ -12,6 +12,7 @@ import { useEhsDetail } from './model/useEhsDetail'
 export function EhsDetailPage() {
   const { category = '' } = useParams<{ category: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const {
     config,
     loading,
@@ -39,7 +40,7 @@ export function EhsDetailPage() {
     scopedRows,
     filteredRows,
     summary,
-  } = useEhsDetail(category)
+  } = useEhsDetail(category, searchParams.get('device'))
 
   if (!config) {
     return (
@@ -117,35 +118,37 @@ export function EhsDetailPage() {
           {loading && <span className="text-[11px] text-slate-400 ml-1">불러오는 중...</span>}
         </div>
 
-        {/* 본체: 라인 선택 여부에 따라 레이아웃 전환 */}
-        <div
-          className={cn(
-            'flex-1 p-3 overflow-hidden gap-3',
-            scopeLine ? 'grid grid-cols-[1fr_500px]' : 'flex flex-col',
-          )}
-        >
-          {/* 도면 — 라인 선택 시에만 등장 */}
-          {scopeLine && (
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
-              {diagram.nodes.length > 0 ? (
-                <DiagramMap
-                  nodes={diagram.nodes}
-                  edges={diagram.edges}
-                  editMode={false}
-                  backgroundImage={mapImage}
-                  selectedDeviceCode={selectedDeviceCode}
-                  alarmStatusByDevice={alarmStatusByDevice}
-                />
-              ) : (
-                <EhsScopeMap
-                  image={mapImage}
-                  pins={mapPins}
-                  selectedCode={selectedDeviceCode}
-                  onPinClick={handleDeviceSelect}
-                />
-              )}
-            </div>
-          )}
+        {/* 본체: 좌측 도면 / 우측 설비 검색 */}
+        <div className="flex-1 p-3 overflow-hidden gap-3 grid grid-cols-[1fr_500px]">
+          {/* 도면 — 선택된 최하위 계층(라인 > 공정 > 공장) 기준 */}
+          <div className="rounded-lg border border-slate-200 overflow-hidden min-w-0">
+            {diagram.nodes.length > 0 ? (
+              <DiagramMap
+                nodes={diagram.nodes}
+                edges={diagram.edges}
+                editMode={false}
+                backgroundImage={mapImage}
+                selectedDeviceCode={selectedDeviceCode}
+                alarmStatusByDevice={alarmStatusByDevice}
+                onDeviceClick={handleDeviceSelect}
+              />
+            ) : mapImage || mapPins.length > 0 ? (
+              <EhsScopeMap
+                image={mapImage}
+                pins={mapPins}
+                selectedCode={selectedDeviceCode}
+                onPinClick={handleDeviceSelect}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center p-6 text-center">
+                <p className="m-0 text-[12px] text-slate-400">
+                  {scopeFactory
+                    ? '이 계층에 등록된 도면이 없습니다'
+                    : '공장을 선택하면 도면이 표시됩니다'}
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* 요약 카드 + 목록 + 상세 */}
           <div className="flex flex-col gap-3 overflow-hidden min-w-0">

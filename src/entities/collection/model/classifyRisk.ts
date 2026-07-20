@@ -40,16 +40,15 @@ export function diagnoseReason(v: number | null | undefined, m: SensorThresholds
   const normalRange = `정상 범위(${fmt(m.normal_min)} ~ ${fmt(m.normal_max)}${u})`
   if (m.reversed) {
     if (risk === 'danger')
-      return `현재 ${fmt(v)}${u} — 위험 기준 ${fmt(m.critical_max)}${u} 이하 (기준比 −${(m.critical_max! - v).toFixed(1)}).`
-    if (risk === 'warning')
-      return `현재 ${fmt(v)}${u} — 경고 기준 ${fmt(m.warning_max)}${u} 이하.`
+      return `현재 ${fmt(v)}${u} — 위험 기준 ${fmt(m.critical_max)}${u} 이하 (기준 −${(m.critical_max! - v).toFixed(1)}).`
+    if (risk === 'warning') return `현재 ${fmt(v)}${u} — 경고 기준 ${fmt(m.warning_max)}${u} 이하.`
     if (risk === 'caution') return `현재 ${fmt(v)}${u} — 정상 상한 ${fmt(m.normal_max)}${u} 초과.`
     return `${normalRange} 내에서 안정적입니다.`
   }
   if (risk === 'danger')
-    return `현재 ${fmt(v)}${u} — 위험 기준 ${fmt(m.critical_min)}${u} 이상 (기준比 +${(v - m.critical_min!).toFixed(1)}).`
+    return `현재 ${fmt(v)}${u} — 위험 기준 ${fmt(m.critical_min)}${u} 이상 (기준 +${(v - m.critical_min!).toFixed(1)}).`
   if (risk === 'warning')
-    return `현재 ${fmt(v)}${u} — 경고 기준 ${fmt(m.warning_min)}${u} 이상 (기준比 +${(v - m.warning_min!).toFixed(1)}).`
+    return `현재 ${fmt(v)}${u} — 경고 기준 ${fmt(m.warning_min)}${u} 이상 (기준 +${(v - m.warning_min!).toFixed(1)}).`
   if (risk === 'caution') return `현재 ${fmt(v)}${u} — 정상 하한 ${fmt(m.normal_min)}${u} 미만.`
   return `${normalRange} 내에서 안정적입니다.`
 }

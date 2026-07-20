@@ -26,13 +26,39 @@ interface TrendPoint {
   count: number
 }
 
-const RISK_STYLE: Record<DeviceRisk, { label: string; badge: string; text: string; bar: string }> = {
-  normal: { label: '정상', badge: 'bg-emerald-50 text-emerald-700', text: 'text-emerald-600', bar: 'bg-emerald-500' },
-  caution: { label: '주의', badge: 'bg-amber-50 text-amber-700', text: 'text-amber-600', bar: 'bg-amber-500' },
-  warning: { label: '경고', badge: 'bg-orange-50 text-orange-700', text: 'text-orange-600', bar: 'bg-orange-500' },
-  danger: { label: '위험', badge: 'bg-red-50 text-red-700', text: 'text-red-600', bar: 'bg-red-600' },
-  offline: { label: '통신두절', badge: 'bg-slate-100 text-slate-500', text: 'text-slate-500', bar: 'bg-slate-400' },
-}
+const RISK_STYLE: Record<DeviceRisk, { label: string; badge: string; text: string; bar: string }> =
+  {
+    normal: {
+      label: '정상',
+      badge: 'bg-emerald-50 text-emerald-700',
+      text: 'text-emerald-600',
+      bar: 'bg-emerald-500',
+    },
+    caution: {
+      label: '주의',
+      badge: 'bg-amber-50 text-amber-700',
+      text: 'text-amber-600',
+      bar: 'bg-amber-500',
+    },
+    warning: {
+      label: '경고',
+      badge: 'bg-orange-50 text-orange-700',
+      text: 'text-orange-600',
+      bar: 'bg-orange-500',
+    },
+    danger: {
+      label: '위험',
+      badge: 'bg-red-50 text-red-700',
+      text: 'text-red-600',
+      bar: 'bg-red-600',
+    },
+    offline: {
+      label: '통신두절',
+      badge: 'bg-slate-100 text-slate-500',
+      text: 'text-slate-500',
+      bar: 'bg-slate-400',
+    },
+  }
 
 function fmt(v: number | null | undefined): string {
   if (v == null) return '−'
@@ -109,7 +135,12 @@ function trendOption(points: TrendPoint[], m: SensorMaster) {
               data: markLines.map((ml) => ({
                 yAxis: ml.yAxis,
                 lineStyle: { color: ml.color, type: 'dashed', width: 1 },
-                label: { formatter: ml.name, color: ml.color, fontSize: 9, position: 'insideEndTop' },
+                label: {
+                  formatter: ml.name,
+                  color: ml.color,
+                  fontSize: 9,
+                  position: 'insideEndTop',
+                },
               })),
             }
           : undefined,
@@ -151,9 +182,9 @@ export function SensorDetailPanel({ sensorCode, onClose }: Props) {
         return
       }
       const t = await api
-        .get<TrendPoint[]>(
-          `/collection/data/trend?sensorCode=${encodeURIComponent(sensorCode)}&hours=6&intervalMinutes=10`,
-        )
+        .get<
+          TrendPoint[]
+        >(`/collection/data/trend?sensorCode=${encodeURIComponent(sensorCode)}&hours=6&intervalMinutes=10`)
         .catch(() => [] as TrendPoint[])
       if (!active) return
       setTrend(t)
@@ -174,7 +205,7 @@ export function SensorDetailPanel({ sensorCode, onClose }: Props) {
       active = false
       clearInterval(timer)
     }
-  }, [sensorCode, parentType, parentId])
+  }, [sensorCode])
 
   const value = latest?.value ?? null
   const risk: DeviceRisk = master ? classifyRisk(value, master) : 'offline'
@@ -220,7 +251,9 @@ export function SensorDetailPanel({ sensorCode, onClose }: Props) {
           <div className="px-4 py-4 border-b border-slate-50">
             <div className="flex items-end justify-between">
               <div className="flex items-baseline gap-1">
-                <span className={`text-[32px] font-bold leading-none ${rs.text}`}>{fmt(value)}</span>
+                <span className={`text-[32px] font-bold leading-none ${rs.text}`}>
+                  {fmt(value)}
+                </span>
                 <span className="text-[13px] text-slate-400">{master?.unit}</span>
               </div>
               <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${rs.badge}`}>
@@ -283,7 +316,9 @@ export function SensorDetailPanel({ sensorCode, onClose }: Props) {
 
           {/* 트렌드 */}
           <div className="px-3 py-3">
-            <p className="m-0 px-1 text-[11px] font-semibold text-slate-500 mb-1">최근 6시간 추이</p>
+            <p className="m-0 px-1 text-[11px] font-semibold text-slate-500 mb-1">
+              최근 6시간 추이
+            </p>
             {trend.length === 0 ? (
               <p className="m-0 px-1 text-[11px] text-slate-400">추이 데이터가 없습니다</p>
             ) : (

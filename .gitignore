@@ -9,6 +9,7 @@ lerna-debug.log*
 
 .claude
 .sixth 
+.docs
 
 node_modules
 dist

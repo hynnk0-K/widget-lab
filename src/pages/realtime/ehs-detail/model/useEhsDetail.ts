@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '@/shared/lib/api'
 import { parsePosition } from '@/shared/lib/parsePosition'
 import { loadDiagram } from '@/shared/lib/diagramStorage'
@@ -13,7 +13,7 @@ import type { EhsRiskLevel } from '@/entities/ehs/model/types'
 
 const POLL_INTERVAL_MS = 5000
 
-export function useEhsDetail(category: string) {
+export function useEhsDetail(category: string, initialDeviceCode?: string | null) {
   const config = getCategoryConfig(category)
 
   const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchAllLatest>>>([])
@@ -110,24 +110,36 @@ export function useEhsDetail(category: string) {
     }
   }
 
+  // 도면은 선택된 가장 하위 계층 기준으로 로드 (라인 > 공정 > 공장)
   useEffect(() => {
-    if (!scopeLine) {
+    const scope = scopeLine
+      ? ({ kind: 'line', node: scopeLine, path: 'lines' } as const)
+      : scopeProcess
+        ? ({ kind: 'process', node: scopeProcess, path: 'processes' } as const)
+        : scopeFactory
+          ? ({ kind: 'factory', node: scopeFactory, path: 'factories' } as const)
+          : null
+
+    if (!scope) {
       setMapImage(null)
       setEquipments([])
       setDiagram({ nodes: [], edges: [] })
       return
     }
+
+    let active = true
     Promise.all([
       api
         .get<{
           imageBase64: string | null
           width: number | null
           height: number | null
-        }>(`/master/lines/${scopeLine.id}/image`)
+        }>(`/master/${scope.path}/${scope.node.id}/image`)
         .catch(() => null),
-      listEquipments(scopeLine.id),
-      loadDiagram('line', scopeLine.id),
+      scope.kind === 'line' ? listEquipments(scope.node.id) : Promise.resolve([]),
+      loadDiagram(scope.kind, scope.node.id),
     ]).then(([img, eqs, diag]) => {
+      if (!active) return
       setMapImage(
         img?.imageBase64 && img.width && img.height
           ? { base64: img.imageBase64, width: img.width, height: img.height }
@@ -144,7 +156,20 @@ export function useEhsDetail(category: string) {
         edges: diag.edges,
       })
     })
-  }, [scopeLine])
+    return () => {
+      active = false
+    }
+  }, [scopeLine, scopeProcess, scopeFactory])
+
+  // 딥링크(?device=CODE)로 진입 시 계층 트리 로드 후 해당 설비 1회 자동 선택
+  const appliedInitialRef = useRef(false)
+  useEffect(() => {
+    if (appliedInitialRef.current) return
+    if (!initialDeviceCode || deviceLineMap.size === 0) return
+    appliedInitialRef.current = true
+    handleDeviceSelect(initialDeviceCode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDeviceCode, deviceLineMap])
 
   useEffect(() => {
     if (!config) return

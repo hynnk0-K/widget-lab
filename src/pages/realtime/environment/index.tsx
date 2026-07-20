@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ManagementLayout } from '@/shared/ui/ManagementLayout'
 import { DiagramMap } from '@/widgets/diagram-map'
 import { RISK_LABEL } from '@/entities/ehs/model/config'
+import { SensorDetailPanel } from '@/entities/collection/ui/SensorDetailPanel'
 import { CategoryCard } from './ui/CategoryCard'
+import { CollectionCard } from './ui/CollectionCard'
 import { useEnvironmentMonitor } from './model/useEnvironmentMonitor'
 
 const LEGEND = [
@@ -28,6 +31,8 @@ export function RealtimeEnvironmentPage() {
     counts,
     events,
     updatedAt,
+    collectionGroups,
+    collectionCodes,
     sensorMarkers,
     slugByDevice,
     mappedLines,
@@ -38,6 +43,17 @@ export function RealtimeEnvironmentPage() {
     mapLoading,
     mappedCount,
   } = useEnvironmentMonitor()
+  const [detailSensor, setDetailSensor] = useState<string | null>(null)
+
+  // 독립 수집 센서면 상세 패널, 환경설비면 카테고리 상세 화면으로
+  function handleSensorSelect(code: string) {
+    if (collectionCodes.has(code)) {
+      setDetailSensor(code)
+      return
+    }
+    const slug = slugByDevice[code]
+    if (slug) navigate(`/realtime/ehs-detail/${slug}`)
+  }
 
   if (loading) {
     return (
@@ -127,16 +143,46 @@ export function RealtimeEnvironmentPage() {
 
         {view === 'board' ? (
           <>
-            {/* 카테고리 카드 */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-              {groups.map((g) => (
-                <CategoryCard
-                  key={g.slug}
-                  group={g}
-                  onClick={() => navigate(`/realtime/ehs-detail/${g.slug}`)}
-                />
-              ))}
+            {/* 환경설비 카테고리 카드 */}
+            <div>
+              <p className="m-0 mb-2 text-[12px] font-semibold text-slate-500">환경설비</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {groups.map((g) => (
+                  <CategoryCard
+                    key={g.slug}
+                    group={g}
+                    onClick={() => navigate(`/realtime/ehs-detail/${g.slug}`)}
+                    onDeviceClick={(code) =>
+                      navigate(`/realtime/ehs-detail/${g.slug}?device=${encodeURIComponent(code)}`)
+                    }
+                  />
+                ))}
+              </div>
             </div>
+
+            {/* 독립 수집 센서 (설비 비소속) */}
+            {collectionGroups.length > 0 && (
+              <div>
+                <p className="m-0 mb-2 text-[12px] font-semibold text-slate-500">
+                  독립 수집 센서
+                  {/* <span className="ml-1.5 font-normal text-slate-400">
+                    센서 클릭 시 상세·이슈 진단
+                  </span> */}
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {collectionGroups.map((g) => (
+                    <CollectionCard
+                      key={g.type}
+                      group={g}
+                      onSensorClick={setDetailSensor}
+                      onSectionClick={() =>
+                        navigate(`/realtime/collection-detail/${encodeURIComponent(g.type)}`)
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 이상 이벤트 피드 */}
             <div className="bg-white rounded-xl border border-slate-200">
@@ -205,21 +251,37 @@ export function RealtimeEnvironmentPage() {
                 <div className="w-5 h-5 border-2 border-[#003087] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <DiagramMap
-                nodes={diagram.nodes}
-                edges={diagram.edges}
-                editMode={false}
-                backgroundImage={bgImage}
-                sensorMarkers={sensorMarkers}
-                onMarkerClick={(code) => {
-                  const slug = slugByDevice[code]
-                  if (slug) navigate(`/realtime/ehs-detail/${slug}`)
-                }}
-              />
+              <div className="relative">
+                <DiagramMap
+                  nodes={diagram.nodes}
+                  edges={diagram.edges}
+                  editMode={false}
+                  backgroundImage={bgImage}
+                  sensorMarkers={sensorMarkers}
+                  onMarkerClick={handleSensorSelect}
+                  onDeviceClick={handleSensorSelect}
+                />
+                {detailSensor && (
+                  <SensorDetailPanel
+                    sensorCode={detailSensor}
+                    onClose={() => setDetailSensor(null)}
+                  />
+                )}
+              </div>
             )}
           </>
         )}
       </div>
+
+      {/* 상황판에서 센서 클릭 시 상세 패널 */}
+      {view === 'board' && detailSensor && (
+        <div className="fixed inset-0 z-40" onClick={() => setDetailSensor(null)}>
+          <div className="absolute inset-0 bg-black/10" />
+          <div className="absolute inset-y-0 right-0" onClick={(e) => e.stopPropagation()}>
+            <SensorDetailPanel sensorCode={detailSensor} onClose={() => setDetailSensor(null)} />
+          </div>
+        </div>
+      )}
     </ManagementLayout>
   )
 }

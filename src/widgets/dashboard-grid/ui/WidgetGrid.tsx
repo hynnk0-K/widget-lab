@@ -11,9 +11,9 @@ import { MiniBar } from '@/entities/widget/ui/MiniBar'
 import { HeatmapHour } from '@/entities/widget/ui/HeatmapHour'
 import { SummaryCard } from '@/entities/widget/ui/SummaryCard'
 import { AlarmFeedWidget } from '@/entities/widget/ui/AlarmFeedWidget'
-import { FactoryMapWidget } from '@/entities/widget/ui/FactoryMapWidget'
-import { LineMapWidget } from '@/entities/widget/ui/LineMapWidget'
-import { SiteMapWidget } from '@/entities/widget/ui/SiteMapWidget'
+import { FactoryMapWidget } from './FactoryMapWidget'
+import { LineMapWidget } from './LineMapWidget'
+import { SiteMapWidget } from './SiteMapWidget'
 import type { DashboardLayout, Widget } from '@/entities/widget/model/types'
 
 interface Props {

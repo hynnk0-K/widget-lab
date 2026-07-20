@@ -7,7 +7,7 @@ import { fetchEnvSensorMarkers } from '@/entities/ehs/model/envSensors'
 import type { EnvSensorMarker } from '@/entities/ehs/model/envSensors'
 import { loadDiagram } from '@/shared/lib/diagramStorage'
 import type { DiagramNode, DiagramEdge } from '@/shared/lib/diagramStorage'
-import type { Widget, LineMapConfig } from '../model/types'
+import type { Widget, LineMapConfig } from '@/entities/widget/model/types'
 
 const POLL_MS = 10_000
 

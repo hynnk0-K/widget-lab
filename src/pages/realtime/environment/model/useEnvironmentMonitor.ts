@@ -285,9 +285,10 @@ export function useEnvironmentMonitor() {
       lines
         .map((line) => ({
           line,
-          count: (diagramsByLine.get(line.id)?.nodes ?? []).filter(
-            (n) => n.deviceCode && sensorMarkers[n.deviceCode],
-          ).length,
+          count: (diagramsByLine.get(line.id)?.nodes ?? []).filter((n) => {
+            const code = n.deviceCode ?? n.sensorCode
+            return code != null && sensorMarkers[code] != null
+          }).length,
         }))
         .filter((x) => x.count > 0),
     [lines, diagramsByLine, sensorMarkers],
@@ -320,7 +321,11 @@ export function useEnvironmentMonitor() {
   }, [lineId, bgByLine])
 
   const mappedCount = useMemo(
-    () => diagram.nodes.filter((n) => n.deviceCode && sensorMarkers[n.deviceCode]).length,
+    () =>
+      diagram.nodes.filter((n) => {
+        const code = n.deviceCode ?? n.sensorCode
+        return code != null && sensorMarkers[code] != null
+      }).length,
     [diagram, sensorMarkers],
   )
 

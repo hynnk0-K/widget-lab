@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { Providers } from '@/app/providers'
-import { Layout } from '@/shared/ui/Layout'
+import { Layout } from '@/app/ui/Layout'
 import { useAuthStore } from '@/entities/user/model/authStore'
 import { LoginPage } from '@/pages/login'
 import { HomePage } from '@/pages/home'
@@ -10,6 +10,7 @@ import { EhsDetailPage } from '@/pages/realtime/ehs-detail'
 import { RealtimeOverviewPage } from '@/pages/realtime/overview'
 import { ProcessEquipmentPage } from '@/pages/realtime/process/[id]'
 import { RealtimeEnvironmentPage } from '@/pages/realtime/environment'
+import { CollectionDetailPage } from '@/pages/realtime/collection-detail'
 import { RealtimeSafetyPage } from '@/pages/realtime/safety'
 import { RealtimeFirefightingPage } from '@/pages/realtime/firefighting'
 import { RealtimeCommStatusPage } from '@/pages/realtime/comm-status'
@@ -78,6 +79,7 @@ function App() {
                       element={<EhsDetailKeyWrapper />}
                     />
                     <Route path="/realtime/environment" element={<RealtimeEnvironmentPage />} />
+                    <Route path="/realtime/collection-detail/:type" element={<CollectionDetailPage />} />
                     <Route path="/realtime/safety" element={<RealtimeSafetyPage />} />
                     <Route path="/realtime/firefighting" element={<RealtimeFirefightingPage />} />
                     <Route path="/realtime/comm-status" element={<RealtimeCommStatusPage />} />

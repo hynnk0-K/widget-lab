@@ -1,5 +1,5 @@
 import { RISK_LABEL } from '@/entities/ehs/model/config'
-import type { DeviceRisk, EnvCategoryGroup } from '../model/useEnvironmentMonitor'
+import type { DeviceRisk, CollectionGroup } from '../model/useEnvironmentMonitor'
 
 const BADGE_LABEL: Record<DeviceRisk, string> = { ...RISK_LABEL, offline: '통신단절' }
 
@@ -27,39 +27,31 @@ const VALUE_CLASS: Record<DeviceRisk, string> = {
   offline: 'text-slate-400',
 }
 
-const MAX_ROWS = 4
+const MAX_ROWS = 6
 
 interface Props {
-  group: EnvCategoryGroup
-  onClick: () => void
-  onDeviceClick: (code: string) => void
+  group: CollectionGroup
+  onSensorClick: (code: string) => void
+  onSectionClick: () => void
 }
 
-export function CategoryCard({ group, onClick, onDeviceClick }: Props) {
-  const { cfg, devices, worst } = group
-  const Icon = cfg.icon
+export function CollectionCard({ group, onSensorClick, onSectionClick }: Props) {
+  const { label, color, devices, worst } = group
   const alert = worst === 'danger' || worst === 'warning'
 
   return (
     <div
-      className={`bg-white rounded-xl p-4 transition-shadow hover:shadow-sm ${
-        alert ? 'border-2 border-red-300' : 'border border-slate-200'
-      }`}
+      className={`bg-white rounded-xl p-4 transition-shadow hover:shadow-sm ${alert ? 'border-2 border-red-300' : 'border border-slate-200'}`}
     >
-      {/* 헤더 클릭 → 카테고리 상세 */}
+      {/* 헤더 클릭 → 센서 유형 상세 화면 */}
       <button
-        onClick={onClick}
+        onClick={onSectionClick}
         className="w-full text-left flex items-center justify-between mb-2.5 group"
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span
-            className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: `${cfg.color}14`, color: cfg.color }}
-          >
-            <Icon className="w-4 h-4" />
-          </span>
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
           <span className="text-[13px] font-semibold text-slate-700 truncate group-hover:text-[#003087] transition-colors">
-            {cfg.koreanLabel}
+            {label}
           </span>
           <span className="text-[11px] text-slate-400 flex-shrink-0">{devices.length}대</span>
         </span>
@@ -72,25 +64,20 @@ export function CategoryCard({ group, onClick, onDeviceClick }: Props) {
         </span>
       </button>
 
-      {/* 개별 설비 클릭 → 해당 설비 선택된 상세 */}
       <div className="space-y-0.5">
-        {devices.length === 0 ? (
-          <p className="text-[11px] text-slate-300 m-0">센서 없음</p>
-        ) : (
-          devices.slice(0, MAX_ROWS).map((d) => (
-            <button
-              key={d.code}
-              onClick={() => onDeviceClick(d.code)}
-              className="w-full flex items-center gap-1.5 text-[12px] px-1 py-0.5 -mx-1 rounded hover:bg-slate-50 transition-colors"
-            >
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT_CLASS[d.risk]}`} />
-              <span className="text-slate-500 truncate">{d.code}</span>
-              <span className={`ml-auto font-medium whitespace-nowrap ${VALUE_CLASS[d.risk]}`}>
-                {d.valueText}
-              </span>
-            </button>
-          ))
-        )}
+        {devices.slice(0, MAX_ROWS).map((d) => (
+          <button
+            key={d.code}
+            onClick={() => onSensorClick(d.code)}
+            className="w-full flex items-center gap-1.5 text-[12px] px-1 py-0.5 -mx-1 rounded hover:bg-slate-50 transition-colors"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT_CLASS[d.risk]}`} />
+            <span className="text-slate-500 truncate">{d.code}</span>
+            <span className={`ml-auto font-medium whitespace-nowrap ${VALUE_CLASS[d.risk]}`}>
+              {d.valueText}
+            </span>
+          </button>
+        ))}
         {devices.length > MAX_ROWS && (
           <p className="text-[10px] text-slate-400 m-0 px-1">
             +{devices.length - MAX_ROWS}개 더보기

@@ -5,7 +5,7 @@ import { getSite } from '@/entities/site/api/siteApi'
 import { listFactories } from '@/entities/factory/api/factoryApi'
 import type { Site } from '@/entities/site/model/types'
 import { FactoryMapWidget } from './FactoryMapWidget'
-import type { Widget, SiteMapConfig } from '../model/types'
+import type { Widget, SiteMapConfig } from '@/entities/widget/model/types'
 
 export function SiteMapWidget({ widget }: { widget: Widget }) {
   const { siteId } = widget.config as SiteMapConfig

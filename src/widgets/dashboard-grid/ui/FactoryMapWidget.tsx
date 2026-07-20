@@ -14,9 +14,9 @@ import type { DiagramData, DiagramNode, DiagramEdge } from '@/shared/lib/diagram
 import { api } from '@/shared/lib/api'
 import type { Factory } from '@/entities/factory/model/types'
 import type { Process } from '@/entities/process/model/types'
-import { METRIC_LABELS } from '../model/metricLabels'
-import { fetchTrend, type TrendPoint } from '../api/widgetApi'
-import type { Widget, FactoryMapConfig } from '../model/types'
+import { METRIC_LABELS } from '@/entities/widget/model/metricLabels'
+import { fetchTrend, type TrendPoint } from '@/entities/widget/api/widgetApi'
+import type { Widget, FactoryMapConfig } from '@/entities/widget/model/types'
 
 // ── 설비 차트 패널 ─────────────────────────────────────────────────
 interface EquipmentLiveDetail {
